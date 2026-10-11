@@ -1,7 +1,35 @@
+# Node.js / Vite / TypeScript
 node_modules/
-dist/
-src-tauri/target/
-src-tauri/gen/
-.DS_Store
-*.log
+/dist/
+/.vite/
 *.tsbuildinfo
+
+# Rust / Tauri build outputs and generated schemas
+/src-tauri/target/
+/src-tauri/gen/
+
+# Test reports and coverage
+/coverage/
+/test-results/
+/playwright-report/
+
+# Local environment variables and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.p12
+*.pfx
+*.key
+
+# Logs
+*.log
+
+# macOS and editor temporary files
+.DS_Store
+._*
+*.swp
+*.swo
+*~
+
+# Keep package-lock.json and src-tauri/Cargo.lock tracked.
