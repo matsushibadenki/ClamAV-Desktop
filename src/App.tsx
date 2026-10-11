@@ -71,8 +71,9 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key =
-        detail === "desktop_required"
+      const key = detail.includes("transfer_insufficient_space")
+        ? "insufficientSpace"
+        : detail === "desktop_required"
           ? "desktopRequired"
           : detail.includes("file_changed")
             ? "fileChanged"

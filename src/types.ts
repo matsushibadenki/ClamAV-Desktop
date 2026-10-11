@@ -63,3 +63,29 @@ export interface Snapshot {
   installerReady: boolean;
   dataDir: string;
 }
+
+export interface CacheReport {
+  bytes: number;
+  reclaimableBytes: number;
+  attempts: number;
+  removable: number;
+  skipped: number;
+}
+export interface FileState {
+  path: string;
+  state: string;
+  bytes: number | null;
+}
+export interface QuarantineDetail {
+  item: QuarantineItem;
+  original: FileState;
+  stored: FileState;
+  transfers: {
+    kind: string;
+    published: boolean;
+    source: FileState;
+    destination: FileState;
+    staged: FileState;
+    temporary: FileState;
+  }[];
+}

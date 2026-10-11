@@ -1,8 +1,10 @@
+import DownloadCache from "../components/DownloadCache";
 import { useState } from "react";
 import { command, desktop } from "../bridge";
 import { date } from "../i18n";
 import type { ViewProps } from "../components/shared";
-export default function Settings({ data, t, run, pending, setup }: ViewProps) {
+export default function Settings(props: ViewProps) {
+  const { data, t, run, pending, setup } = props;
   const [draft, setDraft] = useState(data.settings);
   const busy = pending || !!data.operation || data.scan?.status === "running";
   return (
@@ -44,6 +46,7 @@ export default function Settings({ data, t, run, pending, setup }: ViewProps) {
           </button>
         </div>
       </section>
+      <DownloadCache {...props} />
       <form
         onSubmit={(e) => {
           e.preventDefault();

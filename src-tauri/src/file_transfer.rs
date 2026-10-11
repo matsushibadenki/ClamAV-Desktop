@@ -1,4 +1,4 @@
-//! Durable cross-volume transfer. The source stays in a private staging directory
+//! Durable cross-volume transfer. The source stays in its original location until verified, then in staging
 //! until the owning quarantine row commits. Recovery rolls back uncommitted work.
 use crate::{scanner, store::*};
 use rusqlite::Connection;
@@ -39,16 +39,61 @@ pub fn different_volume(source: &Path, destination: &Path) -> Result<bool> {
             .dev())
 }
 fn sync_dir(path: &Path) -> Result<()> {
-    fs::File::open(path).map_err(err)?.sync_all().map_err(err)
+    match fs::File::open(path).map_err(err)?.sync_all() {
+        Ok(()) => Ok(()),
+        Err(e)
+            if matches!(e.raw_os_error(), Some(libc::EINVAL) | Some(libc::ENOTSUP))
+                && is_exfat(path)? =>
+        {
+            Ok(())
+        }
+        Err(e) => Err(err(e)),
+    }
 }
 fn matches(path: &Path, hash: &str) -> bool {
     fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && !m.file_type().is_symlink())
         && scanner::digest(path).is_ok_and(|h| h == hash)
 }
-fn create_private(path: &Path) -> Result<()> {
+fn is_exfat(path: &Path) -> Result<bool> {
+    use std::os::unix::ffi::OsStrExt;
+    let name = std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(err)?;
+    let mut info = std::mem::MaybeUninit::<libc::statfs>::uninit();
+    if unsafe { libc::statfs(name.as_ptr(), info.as_mut_ptr()) } != 0 {
+        return Err(err(std::io::Error::last_os_error()));
+    }
+    let info = unsafe { info.assume_init() };
+    Ok(unsafe { std::ffi::CStr::from_ptr(info.f_fstypename.as_ptr()) }.to_bytes() == b"exfat")
+}
+fn require_capacity(path: &Path, bytes: u64) -> Result<()> {
+    use std::os::unix::ffi::OsStrExt;
+    let name = std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(err)?;
+    let mut info = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    if unsafe { libc::statvfs(name.as_ptr(), info.as_mut_ptr()) } != 0 {
+        return Err(err(std::io::Error::last_os_error()));
+    }
+    let info = unsafe { info.assume_init() };
+    let available = (info.f_bavail as u64).saturating_mul(info.f_frsize as u64);
+    if available < bytes.saturating_add(1024 * 1024) {
+        return Err("transfer_insufficient_space".into());
+    }
+    Ok(())
+}
+fn transfer_io(e: std::io::Error) -> String {
+    if e.raw_os_error() == Some(libc::ENOSPC) {
+        "transfer_insufficient_space".into()
+    } else {
+        err(e)
+    }
+}
+fn create_private(path: &Path, allow_exfat: bool) -> Result<()> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     fs::create_dir(path).map_err(err)?;
     let result = (|| {
+        // exFAT cannot enforce POSIX permissions. Only explicitly restored copies
+        // and a source already exposed on exFAT may use its temporary directory.
+        if allow_exfat && is_exfat(path)? {
+            return Ok(());
+        }
         private_dir(path)?;
         let meta = fs::metadata(path).map_err(err)?;
         if meta.permissions().mode() & 0o777 != 0o700 || meta.uid() != unsafe { libc::geteuid() } {
@@ -83,6 +128,10 @@ pub fn prepare(
     if fs::symlink_metadata(destination).is_ok() {
         return Err("restore_destination_exists".into());
     }
+    require_capacity(
+        destination.parent().ok_or("invalid_path")?,
+        fs::metadata(source).map_err(err)?.len(),
+    )?;
     let id = uuid::Uuid::new_v4().to_string();
     let j = Journal {
         staging_dir: source
@@ -102,8 +151,8 @@ pub fn prepare(
         published: false,
     };
     // Establish ownership before journalling; no existing directory is reused.
-    create_private(&j.staging_dir)?;
-    if let Err(e) = create_private(&j.temporary_dir) {
+    create_private(&j.staging_dir, kind == "quarantine")?;
+    if let Err(e) = create_private(&j.temporary_dir, kind == "restore") {
         empty_dir(&j.staging_dir);
         return Err(e);
     }
@@ -114,17 +163,14 @@ pub fn prepare(
     }
     let mut j = j;
     let result: Result<()> = (|| {
-        crate::quarantine::move_exclusive(&j.source, &j.staged())?;
-        sync_dir(&j.staging_dir)?;
-        sync_dir(j.source.parent().unwrap())?;
-        if !matches(&j.staged(), hash) {
+        if !matches(&j.source, hash) {
             return Err("file_changed".into());
         }
         use std::os::unix::fs::OpenOptionsExt;
         let mut input = fs::OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW)
-            .open(j.staged())
+            .open(&j.source)
             .map_err(err)?;
         let mut output = fs::OpenOptions::new()
             .write(true)
@@ -132,12 +178,20 @@ pub fn prepare(
             .mode(0o600)
             .open(j.temporary())
             .map_err(err)?;
-        std::io::copy(&mut input, &mut output).map_err(err)?;
-        output.sync_all().map_err(err)?;
-        if !matches(&j.temporary(), hash) || !matches(&j.staged(), hash) {
+        std::io::copy(&mut input, &mut output).map_err(transfer_io)?;
+        output.sync_all().map_err(transfer_io)?;
+        if !matches(&j.temporary(), hash) || !matches(&j.source, hash) {
             return Err("file_changed".into());
         }
         verify(&j.temporary())?;
+        // Keep the original untouched through capacity, copy and detection checks.
+        // The brief exFAT source staging is not claimed to be private quarantine.
+        crate::quarantine::move_exclusive(&j.source, &j.staged())?;
+        sync_dir(&j.staging_dir)?;
+        sync_dir(j.source.parent().unwrap())?;
+        if !matches(&j.staged(), hash) {
+            return Err("file_changed".into());
+        }
         crate::quarantine::move_exclusive(&j.temporary(), &j.destination)?;
         j.published = true;
         j.save(db)?;
@@ -255,6 +309,28 @@ pub fn recover(db: &Connection) -> Result<Vec<String>> {
     }
     Ok(pending)
 }
+pub fn details(
+    db: &Connection,
+    owner: &str,
+) -> Result<Vec<(String, bool, PathBuf, PathBuf, PathBuf, PathBuf)>> {
+    let journals: Vec<Journal> = read_rows(db, "file_transfers")?;
+    Ok(journals
+        .into_iter()
+        .filter(|j| j.owner == owner)
+        .map(|j| {
+            let staged = j.staged();
+            let temporary = j.temporary();
+            (
+                j.kind,
+                j.published,
+                j.source,
+                j.destination,
+                staged,
+                temporary,
+            )
+        })
+        .collect())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,7 +356,7 @@ mod tests {
         .unwrap();
         let external = volume.join(uuid::Uuid::new_v4().to_string());
         fs::create_dir(&external).unwrap();
-        let source = external.join("検証: harmless.txt");
+        let source = external.join("検証 harmless.txt");
         let destination = root.join("quarantined");
         fs::write(&source, b"harmless external volume transfer test").unwrap();
         let hash = scanner::digest(&source).unwrap();
@@ -306,6 +382,53 @@ mod tests {
         assert!(matches(&source, &hash));
         assert!(!destination.exists());
         fs::remove_dir_all(external).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn capacity_rejection_keeps_source_and_creates_no_journal() {
+        let (root, db, src, dest, hash) = fixture();
+        assert_eq!(
+            require_capacity(&root, u64::MAX).unwrap_err(),
+            "transfer_insufficient_space"
+        );
+        assert!(matches(&src, &hash));
+        assert!(!dest.exists());
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM file_transfers", [], |r| r
+                .get::<_, u32>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            transfer_io(std::io::Error::from_raw_os_error(libc::ENOSPC)),
+            "transfer_insufficient_space"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    #[ignore = "requires a dedicated mounted test image via CLAMAV_TEST_VOLUME"]
+    fn actual_insufficient_capacity_preserves_source() {
+        let (root, db, src, _, _) = fixture();
+        let volume = fs::canonicalize(std::env::var("CLAMAV_TEST_VOLUME").unwrap()).unwrap();
+        let destination = volume.join(format!("capacity-{}", uuid::Uuid::new_v4()));
+        let file = fs::OpenOptions::new().write(true).open(&src).unwrap();
+        file.set_len(256 * 1024 * 1024).unwrap();
+        let hash = scanner::digest(&src).unwrap();
+        let result = prepare(&db, "owner", "restore", &src, &destination, &hash, |_| {
+            Ok(())
+        });
+        assert!(result
+            .err()
+            .unwrap()
+            .contains("transfer_insufficient_space"));
+        assert!(matches(&src, &hash));
+        assert!(!destination.exists());
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM file_transfers", [], |r| r
+                .get::<_, u32>(0))
+                .unwrap(),
+            0
+        );
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
@@ -338,6 +461,29 @@ mod tests {
         finish(&db, &j).unwrap();
         assert!(matches(&dest, &hash));
         assert!(!j.staged().exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn late_capacity_failure_keeps_original_and_removes_partial_transfer() {
+        let (root, db, src, dest, hash) = fixture();
+        let result = prepare(&db, "owner", "quarantine", &src, &dest, &hash, |copy| {
+            assert!(matches(&src, &hash));
+            assert!(matches(copy, &hash));
+            Err(transfer_io(std::io::Error::from_raw_os_error(libc::ENOSPC)))
+        });
+        assert!(result
+            .err()
+            .unwrap()
+            .contains("transfer_insufficient_space"));
+        assert!(matches(&src, &hash));
+        assert!(!dest.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM file_transfers", [], |r| r
+                .get::<_, u32>(0))
+                .unwrap(),
+            0
+        );
         fs::remove_dir_all(root).unwrap();
     }
     #[test]

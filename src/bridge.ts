@@ -54,6 +54,9 @@ export function useCore() {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 type Command =
+  | "get_download_cache"
+  | "cleanup_download_cache"
+  | "get_quarantine_detail"
   | "refresh_engine"
   | "prepare_installer"
   | "open_installer"

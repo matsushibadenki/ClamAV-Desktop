@@ -4,7 +4,10 @@ import { command } from "../bridge";
 import { date } from "../i18n";
 import { Empty, type ViewProps } from "../components/shared";
 import Modal from "../components/Modal";
-import type { QuarantineItem } from "../types";
+import QuarantineDetails, {
+  statusLabel,
+} from "../components/QuarantineDetails";
+import type { QuarantineDetail, QuarantineItem } from "../types";
 export default function Quarantine({
   data,
   t,
@@ -13,8 +16,17 @@ export default function Quarantine({
   navigate,
 }: ViewProps) {
   const [restore, setRestore] = useState<QuarantineItem | null>(null);
+  const [detail, setDetail] = useState<QuarantineDetail | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const showDetail = (id: string) =>
+    run(async () =>
+      setDetail(
+        await command<QuarantineDetail>("get_quarantine_detail", { id }),
+      ),
+    );
   const items = data.quarantine.filter(
-    (q) => q.status !== "restored" && q.status !== "move_failed",
+    (q) =>
+      showCompleted || (q.status !== "restored" && q.status !== "move_failed"),
   );
   return (
     <>
@@ -22,6 +34,14 @@ export default function Quarantine({
         <h1>{t("quarantineTitle")}</h1>
         <p>{t("quarantineDesc")}</p>
       </header>
+      <label className="completed-toggle">
+        <input
+          type="checkbox"
+          checked={showCompleted}
+          onChange={(e) => setShowCompleted(e.target.checked)}
+        />
+        {t("showCompleted")}
+      </label>
       <section className="panel">
         {items.length === 0 ? (
           <Empty
@@ -43,39 +63,58 @@ export default function Quarantine({
                   <p className="path">{item.originalPath}</p>
                   <small>
                     {date(item.quarantinedAt, data.settings.language)}
-                    {item.status !== "active" && ` · ${t("review")}`}
+                    {` · ${statusLabel(item.status, t)}`}
                   </small>
                 </div>
-                {item.status === "transfer_pending" ? (
-                  <div>
-                    <p className="helper">{t("transferPending")}</p>
-                    <button
-                      className="secondary"
-                      disabled={pending}
-                      onClick={() =>
-                        void run(() => command("recover_file_transfers"))
-                      }
-                    >
-                      {t("retryRecovery")}
-                    </button>
-                  </div>
-                ) : (
+                <div className="quarantine-actions">
                   <button
                     className="secondary"
-                    disabled={
-                      pending || !["active", "review"].includes(item.status)
-                    }
-                    onClick={() => setRestore(item)}
+                    disabled={pending}
+                    onClick={() => void showDetail(item.id)}
                   >
-                    <RotateCcw size={15} />
-                    {t("restore")}
+                    {t("details")}
                   </button>
-                )}
+                  {item.status === "transfer_pending" ? (
+                    <div>
+                      <p className="helper">{t("transferPending")}</p>
+                      <button
+                        className="secondary"
+                        disabled={pending}
+                        onClick={() =>
+                          void run(() => command("recover_file_transfers"))
+                        }
+                      >
+                        {t("retryRecovery")}
+                      </button>
+                    </div>
+                  ) : ["active", "review"].includes(item.status) ? (
+                    <button
+                      className="secondary"
+                      disabled={
+                        pending || !["active", "review"].includes(item.status)
+                      }
+                      onClick={() => setRestore(item)}
+                    >
+                      <RotateCcw size={15} />
+                      {t("restore")}
+                    </button>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>
         )}
       </section>
+      {detail && (
+        <QuarantineDetails
+          detail={detail}
+          t={t}
+          language={data.settings.language}
+          close={() => setDetail(null)}
+          refresh={() => void showDetail(detail.item.id)}
+          pending={pending}
+        />
+      )}
       {restore && (
         <Modal
           title={t("restoreTitle")}

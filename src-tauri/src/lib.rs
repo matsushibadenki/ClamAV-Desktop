@@ -1,3 +1,5 @@
+mod details;
+mod downloads;
 mod engine;
 mod file_transfer;
 mod installer;
@@ -88,6 +90,28 @@ async fn recover_file_transfers(app: AppHandle, window: WebviewWindow) -> Result
     })
     .await
     .map_err(err)?
+}
+#[tauri::command]
+async fn get_download_cache(app: AppHandle) -> Result<downloads::CacheReport> {
+    tauri::async_runtime::spawn_blocking(move || downloads::report(&core(&app)))
+        .await
+        .map_err(err)?
+}
+#[tauri::command]
+async fn cleanup_download_cache(
+    app: AppHandle,
+    window: WebviewWindow,
+) -> Result<downloads::CacheReport> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn_blocking(move || downloads::cleanup(&app))
+        .await
+        .map_err(err)?
+}
+#[tauri::command]
+async fn get_quarantine_detail(app: AppHandle, id: String) -> Result<details::Detail> {
+    tauri::async_runtime::spawn_blocking(move || details::get(&core(&app), &id))
+        .await
+        .map_err(err)?
 }
 #[tauri::command]
 fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
@@ -219,6 +243,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
+            get_download_cache,
+            cleanup_download_cache,
+            get_quarantine_detail,
             refresh_engine,
             prepare_installer,
             open_installer,
