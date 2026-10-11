@@ -103,6 +103,39 @@ export default function Settings(props: ViewProps) {
           </label>
         </section>
         <section className="settings-section">
+          <h2>{t("downloadPolicy")}</h2>
+          <label className="field">
+            <span>{t("retentionDays")}</span>
+            <input
+              required
+              type="number"
+              min={1}
+              max={365}
+              value={draft.downloadRetentionDays}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  downloadRetentionDays: Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>{t("cacheLimitMb")}</span>
+            <input
+              required
+              type="number"
+              min={257}
+              max={16384}
+              value={draft.downloadCacheMb}
+              onChange={(e) =>
+                setDraft({ ...draft, downloadCacheMb: Number(e.target.value) })
+              }
+            />
+          </label>
+          <p>{t("cacheLimitHelp")}</p>
+        </section>
+        <section className="settings-section">
           <h2>{t("limits")}</h2>
           <label className="field">
             <span>{t("maxFile")}</span>

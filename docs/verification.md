@@ -32,3 +32,10 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Native debug app uses an isolated `/private/tmp/clamav-storage-qa` fixture. Settings rendered 4 MiB / 2 attempts, with 2 MiB / 1 attempt reclaimable. The delete confirmation and cancellation were exercised. Actual deletion is verified by Rust tests; user downloads were not deleted.
 - Quarantine rendered a recovery-pending journal, original/stored/staged/temporary paths, stored SHA-256 and file presence. Detail scrolling, refresh, close and the restored-record filter were exercised with harmless fixtures. Native screenshots showed no clipping or framework overlay at 1180 × 800.
 - Native WebView console logs were not captured. Narrow window and additional language UI screenshots remain unverified; translation completeness is checked automatically.
+
+## Configurable cache policy and quarantine filters
+
+- Rust: 22 tests passed, 4 environment-dependent tests ignored. New tests cover legacy settings defaults, saved retention changing eligible attempts, and quota rejection while existing downloads remain intact.
+- Frontend: 3 tests passed. Search tests cover Unicode normalization, multiple query terms, translated status, completion filtering, attention/date ordering and preservation of the shared snapshot array.
+- Native release app at tauri://localhost: existing settings loaded with 30-day/1024-MiB defaults; new numeric fields and policy explanation rendered. Japanese/English search input, no-results feedback, clearing search and selecting attention order were exercised. Screenshots confirmed readable layout at 1180 × 800. Setting changes in the user's normal data were not saved; persistence is covered by the Rust settings serialization and existing SQLite settings path.
+- Release app, ad-hoc signing and DMG integrity checks passed. Narrow-window rendering and native console logs were not inspected for this change.

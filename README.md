@@ -66,3 +66,9 @@ Cross-volume transfers check destination capacity plus a 1 MiB reserve and retai
 Settings shows installer cache usage and lets you remove managed attempts unchanged for 30 days while protecting the prepared package. Quarantine details shows recovery state, paths, sizes and the recorded hash, including restored or failed records.
 
 设置显示安装程序缓存容量，可清理30天未更新的托管下载，并保护已准备的安装程序。隔离详情显示恢复状态、路径、容量及记录的哈希值，也可查看已恢复和失败的记录。
+
+保持期間（1〜365日）とダウンロード容量上限（257〜16,384MiB）を設定・保存できます。容量上限は新規取得時に適用し、既存ファイルは自動削除しません。隔離一覧はパス・検出名・状態で検索し、新旧順・パス順・確認が必要な順に並び替えられます。
+
+Configure retention (1–365 days) and the managed download limit (257–16,384 MiB). New downloads reserve space for the maximum package and signature; existing files are never automatically deleted. Search quarantine by path, detection or localized status and sort by date, path or attention needed.
+
+可设置保留期限（1–365天）与托管下载容量上限（257–16,384 MiB）。新下载预留安装包及签名的最大空间；不会自动删除已有文件。隔离列表支持按路径、检测名称或本地化状态搜索，并按日期、路径或处理优先级排序。

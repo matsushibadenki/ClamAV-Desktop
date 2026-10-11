@@ -1,6 +1,46 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  downloadPolicy: [
+    "Download retention and limit",
+    "ダウンロードの保持期間と上限",
+    "下载保留期限与上限",
+  ],
+  retentionDays: ["Retention (days)", "保持期間（日）", "保留期限（天）"],
+  cacheLimitMb: [
+    "Download limit (MiB)",
+    "ダウンロード容量上限（MiB）",
+    "下载容量上限（MiB）",
+  ],
+  cacheLimitHelp: [
+    "The saved policy applies to manual cleanup. No automatic deletion. New downloads require room for a maximum 256 MiB package and its signature within the limit; protected files can prevent downloading.",
+    "保存した保持期間を手動削除に適用します。自動削除はしません。新規ダウンロードには上限内で最大256MiBのPKGと署名分の余裕が必要です。保護対象がある場合はダウンロードを開始できないことがあります。",
+    "已保存的保留期限用于手动清理，不自动删除。新下载需要在上限内预留最多256 MiB安装包及签名的空间；受保护文件可能导致无法下载。",
+  ],
+  cacheLimitExceeded: [
+    "Download cache limit reached. Remove eligible downloads or increase the saved limit in Settings.",
+    "ダウンロード容量上限に達しています。削除可能な保存先を整理するか、設定で上限を増やして保存してください。",
+    "已达到下载缓存上限。请清理可删除的下载或在设置中提高上限并保存。",
+  ],
+  searchQuarantine: ["Search quarantine", "隔離記録を検索", "搜索隔离记录"],
+  searchQuarantineHint: [
+    "Search by path, detection or status",
+    "パス・検出名・状態で検索",
+    "按路径、检测名称或状态搜索",
+  ],
+  sortQuarantine: ["Sort order", "並び順", "排序"],
+  sortNewest: ["Newest first", "新しい順", "最新优先"],
+  sortOldest: ["Oldest first", "古い順", "最早优先"],
+  sortPath: ["Original path", "元のパス順", "原路径顺序"],
+  sortAttention: ["Needs attention first", "確認が必要な順", "需处理优先"],
+  matchingRecords: ["Matching records", "表示件数", "匹配记录"],
+  noSearchResults: [
+    "No matching records",
+    "一致する記録がありません",
+    "没有匹配的记录",
+  ],
+  clearSearch: ["Clear search", "検索を解除", "清除搜索"],
+
   recordedHash: ["Recorded SHA-256", "記録済みのSHA-256", "记录的SHA-256"],
   cache_cleaned: [
     "Download cache cleaned",
@@ -13,9 +53,9 @@ const copy = {
     "安装程序下载",
   ],
   cachePolicy: [
-    "Remove recognizable installer downloads unchanged for 30 days. The prepared installer, unknown files and links are kept. Definitions, quarantine and history are preserved.",
-    "30日以上更新されていないインストーラーダウンロードを削除します。準備済みのインストーラー、不明なファイル、リンクは残します。定義・隔離・履歴は保持します。",
-    "删除30天未更新的安装程序下载。保留已准备的安装程序、未知文件和链接。保留病毒库、隔离文件和历史。",
+    "Remove recognizable installer downloads older than the saved retention period. The prepared installer, unknown files and links are kept. Definitions, quarantine and history are preserved.",
+    "保存した保持期間を過ぎたインストーラーダウンロードを削除します。準備済みのインストーラー、不明なファイル、リンクは残します。定義・隔離・履歴は保持します。",
+    "删除超过已保存保留期限的安装程序下载。保留已准备的安装程序、未知文件和链接。保留病毒库、隔离文件和历史。",
   ],
   cacheSize: [
     "Managed downloads / attempts",

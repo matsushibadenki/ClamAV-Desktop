@@ -1,4 +1,5 @@
 import { Archive, RotateCcw } from "lucide-react";
+import { quarantineList, type QuarantineSort } from "../quarantine-list";
 import { useState } from "react";
 import { command } from "../bridge";
 import { date } from "../i18n";
@@ -17,6 +18,8 @@ export default function Quarantine({
 }: ViewProps) {
   const [restore, setRestore] = useState<QuarantineItem | null>(null);
   const [detail, setDetail] = useState<QuarantineDetail | null>(null);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<QuarantineSort>("newest");
   const [showCompleted, setShowCompleted] = useState(false);
   const showDetail = (id: string) =>
     run(async () =>
@@ -24,9 +27,12 @@ export default function Quarantine({
         await command<QuarantineDetail>("get_quarantine_detail", { id }),
       ),
     );
-  const items = data.quarantine.filter(
-    (q) =>
-      showCompleted || (q.status !== "restored" && q.status !== "move_failed"),
+  const items = quarantineList(
+    data.quarantine,
+    query,
+    showCompleted,
+    sort,
+    (status) => statusLabel(status, t),
   );
   return (
     <>
@@ -34,6 +40,32 @@ export default function Quarantine({
         <h1>{t("quarantineTitle")}</h1>
         <p>{t("quarantineDesc")}</p>
       </header>
+      <div className="quarantine-filters">
+        <label className="field">
+          <span>{t("searchQuarantine")}</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchQuarantineHint")}
+          />
+        </label>
+        <label className="field">
+          <span>{t("sortQuarantine")}</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as QuarantineSort)}
+          >
+            <option value="newest">{t("sortNewest")}</option>
+            <option value="oldest">{t("sortOldest")}</option>
+            <option value="path">{t("sortPath")}</option>
+            <option value="attention">{t("sortAttention")}</option>
+          </select>
+        </label>
+      </div>
+      <p className="helper" role="status">
+        {t("matchingRecords")}: {items.length}
+      </p>
       <label className="completed-toggle">
         <input
           type="checkbox"
@@ -46,12 +78,20 @@ export default function Quarantine({
         {items.length === 0 ? (
           <Empty
             icon="shield"
-            title={t("emptyQuarantine")}
-            description={t("emptyQuarantineDesc")}
+            title={t(query.trim() ? "noSearchResults" : "emptyQuarantine")}
+            description={t(
+              query.trim() ? "searchQuarantineHint" : "emptyQuarantineDesc",
+            )}
           >
-            <button className="secondary" onClick={() => navigate("scan")}>
-              {t("startScan")}
-            </button>
+            {query.trim() ? (
+              <button className="secondary" onClick={() => setQuery("")}>
+                {t("clearSearch")}
+              </button>
+            ) : (
+              <button className="secondary" onClick={() => navigate("scan")}>
+                {t("startScan")}
+              </button>
+            )}
           </Empty>
         ) : (
           <div className="quarantine-list">

@@ -6,6 +6,7 @@ use std::{
     path::Path,
     time::{Duration, SystemTime},
 };
+#[cfg(test)]
 const RETENTION: Duration = Duration::from_secs(30 * 24 * 3600);
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,7 +31,12 @@ fn installer_file(name: &str) -> bool {
             .iter()
             .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
 }
-fn inspect(dir: &Path, protected: Option<&Path>, now: SystemTime) -> Result<Option<(u64, bool)>> {
+fn inspect(
+    dir: &Path,
+    protected: Option<&Path>,
+    now: SystemTime,
+    retention: Duration,
+) -> Result<Option<(u64, bool)>> {
     let meta = fs::symlink_metadata(dir).map_err(err)?;
     if !meta.is_dir() || meta.file_type().is_symlink() {
         return Ok(None);
@@ -48,7 +54,7 @@ fn inspect(dir: &Path, protected: Option<&Path>, now: SystemTime) -> Result<Opti
         newest = newest.max(meta.modified().map_err(err)?);
         bytes = bytes.saturating_add(meta.len());
     }
-    let old = now.duration_since(newest).is_ok_and(|age| age >= RETENTION);
+    let old = now.duration_since(newest).is_ok_and(|age| age >= retention);
     let active = protected.is_some_and(|p| p.parent() == Some(dir));
     Ok(Some((bytes, old && !active)))
 }
@@ -57,6 +63,7 @@ fn manage(
     protected: Option<&Path>,
     now: SystemTime,
     remove: bool,
+    retention: Duration,
 ) -> Result<CacheReport> {
     safe_path(root)?;
     let mut report = CacheReport {
@@ -77,7 +84,7 @@ fn manage(
             report.skipped += 1;
             continue;
         }
-        match inspect(&path, protected, now)? {
+        match inspect(&path, protected, now, retention)? {
             Some((bytes, eligible)) => {
                 report.attempts += 1;
                 report.bytes = report.bytes.saturating_add(bytes);
@@ -101,7 +108,16 @@ pub fn report(c: &Core) -> Result<CacheReport> {
         prepared.as_ref().map(|(p, _)| p.as_path()),
         SystemTime::now(),
         false,
+        Duration::from_secs(c.snapshot().settings.download_retention_days as u64 * 86400),
     )
+}
+pub fn ensure_download_budget(c: &Core) -> Result<()> {
+    let maximum_attempt = 256 * 1024 * 1024 + 16384;
+    let limit = c.snapshot().settings.download_cache_mb as u64 * 1024 * 1024;
+    if report(c)?.bytes.saturating_add(maximum_attempt) > limit {
+        return Err("download_cache_limit_exceeded".into());
+    }
+    crate::file_transfer::require_capacity(&c.root.join("downloads"), maximum_attempt)
 }
 pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
     let c = core(app);
@@ -125,6 +141,7 @@ pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
             prepared.as_ref().map(|(p, _)| p.as_path()),
             SystemTime::now(),
             true,
+            Duration::from_secs(c.snapshot().settings.download_retention_days as u64 * 86400),
         )
     };
     c.document.lock().unwrap().operation = None;
@@ -146,6 +163,49 @@ pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
 mod tests {
     use super::*;
     #[test]
+    fn quota_and_retention_use_saved_settings_without_deleting_new_files() {
+        let root = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        let c = Core::new(root.clone()).unwrap();
+        c.document.lock().unwrap().settings.download_cache_mb = 257;
+        let attempt = c
+            .root
+            .join("downloads")
+            .join(uuid::Uuid::new_v4().to_string());
+        fs::create_dir(&attempt).unwrap();
+        fs::write(
+            attempt.join("clamav-1.4.0.macos.universal.pkg"),
+            vec![0; 2 * 1024 * 1024],
+        )
+        .unwrap();
+        assert_eq!(
+            ensure_download_budget(&c).unwrap_err(),
+            "download_cache_limit_exceeded"
+        );
+        assert_eq!(report(&c).unwrap().removable, 0);
+        let future = SystemTime::now() + Duration::from_secs(2 * 86400);
+        assert_eq!(
+            manage(
+                &c.root.join("downloads"),
+                None,
+                future,
+                false,
+                Duration::from_secs(86400)
+            )
+            .unwrap()
+            .removable,
+            1
+        );
+        assert_eq!(
+            manage(&c.root.join("downloads"), None, future, false, RETENTION)
+                .unwrap()
+                .removable,
+            0
+        );
+        assert!(attempt.exists());
+        drop(c);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn removes_only_old_known_attempts_and_preserves_prepared_unknown_and_symlinks() {
         let root = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
         fs::create_dir(&root).unwrap();
@@ -163,14 +223,21 @@ mod tests {
         let link = root.join(uuid::Uuid::new_v4().to_string());
         std::os::unix::fs::symlink(&unknown, &link).unwrap();
         let now = SystemTime::now();
-        assert_eq!(manage(&root, Some(&pkg), now, true).unwrap().removable, 0);
+        assert_eq!(
+            manage(&root, Some(&pkg), now, true, RETENTION)
+                .unwrap()
+                .removable,
+            0
+        );
         let future = now + RETENTION + Duration::from_secs(2);
-        let preview = manage(&root, Some(&pkg), future, false).unwrap();
+        let preview = manage(&root, Some(&pkg), future, false, RETENTION).unwrap();
         assert_eq!(preview.reclaimable_bytes, 5);
         assert_eq!(preview.skipped, 2);
         assert!(old.exists());
         assert_eq!(
-            manage(&root, Some(&pkg), future, true).unwrap().removable,
+            manage(&root, Some(&pkg), future, true, RETENTION)
+                .unwrap()
+                .removable,
             1
         );
         assert!(!old.exists());

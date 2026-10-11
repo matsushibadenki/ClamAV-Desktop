@@ -21,6 +21,8 @@ let snapshot: Snapshot = {
     scheduleEnabled: false,
     scheduleHour: 12,
     maxFileMb: 100,
+    downloadRetentionDays: 30,
+    downloadCacheMb: 1024,
   },
   activity: [],
   operation: null,

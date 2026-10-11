@@ -1081,3 +1081,22 @@ nav button.active {
     justify-content: flex-start;
   }
 }
+
+.quarantine-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px);
+  gap: 16px;
+}
+.quarantine-filters .field {
+  min-width: 0;
+}
+.quarantine-filters input,
+.quarantine-filters select {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .quarantine-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

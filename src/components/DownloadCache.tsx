@@ -30,7 +30,12 @@ export default function DownloadCache({ t, run, pending, data }: ViewProps) {
     return () => {
       live = false;
     };
-  }, [data.installerReady, data.operation?.kind]);
+  }, [
+    data.installerReady,
+    data.operation?.kind,
+    data.settings.downloadRetentionDays,
+    data.settings.downloadCacheMb,
+  ]);
   const refresh = () =>
     run(async () =>
       setReport(await command<CacheReport>("get_download_cache")),
@@ -39,6 +44,10 @@ export default function DownloadCache({ t, run, pending, data }: ViewProps) {
     <section className="settings-section">
       <h2>{t("downloadCache")}</h2>
       <p>{t("cachePolicy")}</p>
+      <p className="helper">
+        {t("retentionDays")}: {data.settings.downloadRetentionDays} ·{" "}
+        {t("cacheLimitMb")}: {data.settings.downloadCacheMb}
+      </p>
       {report ? (
         <dl>
           <div>

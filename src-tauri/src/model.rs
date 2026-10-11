@@ -7,6 +7,16 @@ pub struct Settings {
     pub schedule_enabled: bool,
     pub schedule_hour: u32,
     pub max_file_mb: u32,
+    #[serde(default = "default_retention")]
+    pub download_retention_days: u32,
+    #[serde(default = "default_cache_limit")]
+    pub download_cache_mb: u32,
+}
+fn default_retention() -> u32 {
+    30
+}
+fn default_cache_limit() -> u32 {
+    1024
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -16,6 +26,8 @@ impl Default for Settings {
             schedule_enabled: false,
             schedule_hour: 12,
             max_file_mb: 100,
+            download_retention_days: default_retention(),
+            download_cache_mb: default_cache_limit(),
         }
     }
 }
@@ -94,4 +106,21 @@ pub struct Snapshot {
     pub activity_dock: String,
     pub installer_ready: bool,
     pub data_dir: String,
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+    #[test]
+    fn previous_settings_keep_existing_choices_and_gain_cache_defaults() {
+        let old = r#"{"language":"en","autoUpdate":true,"scheduleEnabled":false,"scheduleHour":8,"maxFileMb":200}"#;
+        let settings: Settings = serde_json::from_str(old).unwrap();
+        assert_eq!(settings.language, "en");
+        assert_eq!(settings.max_file_mb, 200);
+        assert_eq!(settings.download_retention_days, 30);
+        assert_eq!(settings.download_cache_mb, 1024);
+        let decoded: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(decoded.download_retention_days, 30);
+    }
 }

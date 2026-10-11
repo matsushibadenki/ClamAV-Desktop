@@ -64,7 +64,7 @@ fn is_exfat(path: &Path) -> Result<bool> {
     let info = unsafe { info.assume_init() };
     Ok(unsafe { std::ffi::CStr::from_ptr(info.f_fstypename.as_ptr()) }.to_bytes() == b"exfat")
 }
-fn require_capacity(path: &Path, bytes: u64) -> Result<()> {
+pub(crate) fn require_capacity(path: &Path, bytes: u64) -> Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let name = std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(err)?;
     let mut info = std::mem::MaybeUninit::<libc::statvfs>::uninit();

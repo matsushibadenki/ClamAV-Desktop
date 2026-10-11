@@ -119,6 +119,8 @@ fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> R
     if !["ja", "en", "zh-CN"].contains(&settings.language.as_str())
         || settings.schedule_hour > 23
         || !(1..=4096).contains(&settings.max_file_mb)
+        || !(1..=365).contains(&settings.download_retention_days)
+        || !(257..=16384).contains(&settings.download_cache_mb)
     {
         return Err("invalid_settings".into());
     }

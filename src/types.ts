@@ -6,6 +6,8 @@ export interface Settings {
   scheduleEnabled: boolean;
   scheduleHour: number;
   maxFileMb: number;
+  downloadRetentionDays: number;
+  downloadCacheMb: number;
 }
 export interface Engine {
   path: string | null;

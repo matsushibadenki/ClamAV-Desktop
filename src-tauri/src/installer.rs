@@ -176,6 +176,7 @@ async fn prepare_inner(app: &AppHandle) -> Result<()> {
         return Err("macos_only".into());
     }
     let c = core(app);
+    crate::downloads::ensure_download_budget(&c)?;
     let dir = c
         .root
         .join("downloads")
