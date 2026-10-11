@@ -60,3 +60,9 @@ A macOS ClamAV frontend with Rust-owned state and a Tauri 2 WebView. It supports
 Cross-volume transfers check destination capacity plus a 1 MiB reserve and retain the original through copy verification. exFAT quarantine stores the authoritative copy in private app storage; restoring to exFAT cannot reproduce POSIX permissions. Source staging on exFAT is not private isolation.
 
 跨卷传输检查目标可用空间并预留1 MiB，在副本验证完成前保留原文件。exFAT文件隔离至应用的私有存储；恢复至exFAT无法还原POSIX权限。exFAT上的源文件暂存区不提供私有隔离。
+
+設定画面でインストーラーダウンロードの容量と削除候補を確認できます。30日以上更新されていない管理対象だけを削除し、準備済みPKGは保持します。隔離の「詳細」では復旧状態、パス、容量、記録済みハッシュを確認できます。復元済み・失敗済みの記録も表示できます。
+
+Settings shows installer cache usage and lets you remove managed attempts unchanged for 30 days while protecting the prepared package. Quarantine details shows recovery state, paths, sizes and the recorded hash, including restored or failed records.
+
+设置显示安装程序缓存容量，可清理30天未更新的托管下载，并保护已准备的安装程序。隔离详情显示恢复状态、路径、容量及记录的哈希值，也可查看已恢复和失败的记录。

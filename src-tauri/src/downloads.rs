@@ -16,6 +16,20 @@ pub struct CacheReport {
     pub removable: usize,
     pub skipped: usize,
 }
+fn installer_file(name: &str) -> bool {
+    let package = name.strip_suffix(".sig").unwrap_or(name);
+    let Some(version) = package
+        .strip_prefix("clamav-")
+        .and_then(|v| v.strip_suffix(".macos.universal.pkg"))
+    else {
+        return false;
+    };
+    let parts: Vec<_> = version.split('.').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+}
 fn inspect(dir: &Path, protected: Option<&Path>, now: SystemTime) -> Result<Option<(u64, bool)>> {
     let meta = fs::symlink_metadata(dir).map_err(err)?;
     if !meta.is_dir() || meta.file_type().is_symlink() {
@@ -28,11 +42,7 @@ fn inspect(dir: &Path, protected: Option<&Path>, now: SystemTime) -> Result<Opti
         let path = entry.map_err(err)?.path();
         let meta = fs::symlink_metadata(&path).map_err(err)?;
         let name = path.file_name().unwrap().to_string_lossy();
-        if !meta.is_file()
-            || meta.file_type().is_symlink()
-            || !name.starts_with("clamav-")
-            || !(name.ends_with(".pkg") || name.ends_with(".pkg.sig"))
-        {
+        if !meta.is_file() || meta.file_type().is_symlink() || !installer_file(&name) {
             return Ok(None);
         }
         newest = newest.max(meta.modified().map_err(err)?);
@@ -142,10 +152,10 @@ mod tests {
         let root = fs::canonicalize(root).unwrap();
         let old = root.join(uuid::Uuid::new_v4().to_string());
         fs::create_dir(&old).unwrap();
-        fs::write(old.join("clamav-old.pkg"), b"12345").unwrap();
+        fs::write(old.join("clamav-1.4.0.macos.universal.pkg"), b"12345").unwrap();
         let active = root.join(uuid::Uuid::new_v4().to_string());
         fs::create_dir(&active).unwrap();
-        let pkg = active.join("clamav-ready.pkg");
+        let pkg = active.join("clamav-1.5.4.macos.universal.pkg");
         fs::write(&pkg, b"ready").unwrap();
         let unknown = root.join(uuid::Uuid::new_v4().to_string());
         fs::create_dir(&unknown).unwrap();

@@ -30,7 +30,7 @@ export default function DownloadCache({ t, run, pending, data }: ViewProps) {
     return () => {
       live = false;
     };
-  }, [data.installerReady, data.operation]);
+  }, [data.installerReady, data.operation?.kind]);
   const refresh = () =>
     run(async () =>
       setReport(await command<CacheReport>("get_download_cache")),

@@ -25,3 +25,10 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Added automatic tests for capacity rejection and an injected late ENOSPC failure, verifying original preservation, temporary cleanup and journal cleanup. This injection tests rollback after copying; it does not prove hardware behavior during a partial write.
 - Actual exFAT round-trip and real volume-capacity tests are available as ignored tests via CLAMAV_TEST_VOLUME. They remain pending: hdiutil/diskutil image creation fails with OS errors in this environment. Physical-device removal and exFAT directory-sync durability remain unverified.
 - Test volume and temporary app state were removed after verification. The final optimized app uses the normal application-data directory.
+
+## Download storage and quarantine detail verification
+
+- Rust cache test covers the 30-day age policy, dry-run bytes, deletion, prepared-package protection, unknown-file preservation and symlink exclusion. Metadata tests cover file bytes, absent paths and rejected links, including a symlink in an ancestor directory.
+- Native debug app uses an isolated `/private/tmp/clamav-storage-qa` fixture. Settings rendered 4 MiB / 2 attempts, with 2 MiB / 1 attempt reclaimable. The delete confirmation and cancellation were exercised. Actual deletion is verified by Rust tests; user downloads were not deleted.
+- Quarantine rendered a recovery-pending journal, original/stored/staged/temporary paths, stored SHA-256 and file presence. Detail scrolling, refresh, close and the restored-record filter were exercised with harmless fixtures. Native screenshots showed no clipping or framework overlay at 1180 × 800.
+- Native WebView console logs were not captured. Narrow window and additional language UI screenshots remain unverified; translation completeness is checked automatically.
