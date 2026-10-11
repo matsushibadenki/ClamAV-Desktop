@@ -1,6 +1,68 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  integrityTitle: [
+    "Quarantine integrity",
+    "隔離データの整合性",
+    "隔离数据完整性",
+  ],
+  integrityHelp: [
+    "Compare the stored file with its recorded SHA-256. This does not run a virus scan or move files. Results describe the last check; files may change afterwards.",
+    "隔離先のファイルと記録済みSHA-256を比較します。ウイルスの再検査や移動は行いません。結果は最終確認時点の状態で、その後の変更は反映しません。",
+    "比较隔离文件与记录的SHA-256。不进行病毒扫描或移动文件。结果仅表示上次检查时的状态，之后文件可能发生变化。",
+  ],
+  integrityNotChecked: [
+    "No manual integrity check recorded.",
+    "手動の整合性確認はまだ記録されていません。",
+    "尚未记录手动完整性检查。",
+  ],
+  verifyIntegrity: ["Check SHA-256", "SHA-256を再確認", "重新检查SHA-256"],
+  lastIntegrityCheck: ["Last checked", "最終確認日時", "上次检查时间"],
+  actualHash: ["SHA-256 at last check", "確認時のSHA-256", "检查时的SHA-256"],
+  diagnosticDetails: ["Technical details", "診断の詳細", "技术详情"],
+  recoveryReason: [
+    "Last recovery failure",
+    "直近の復旧失敗の理由",
+    "最近恢复失败原因",
+  ],
+  recoveryChanged: [
+    "A retained file no longer matches the recorded hash. Preserve all copies and check the details before retrying.",
+    "保全したファイルのハッシュが記録と一致しません。コピーをすべて保持し、詳細を確認してください。",
+    "保留文件的哈希与记录不一致。请保留所有副本并检查详情。",
+  ],
+  recoveryAmbiguous: [
+    "The destination exists but its ownership is not confirmed. It is preserved for review.",
+    "転送先が存在しますが、この転送のコピーであることを確定できません。確認のため保持しています。",
+    "目标文件存在，但无法确认其属于本次传输。已保留供检查。",
+  ],
+  recoveryConflict: [
+    "The source could not be restored. Check for an existing original path, a read-only volume or access restrictions. Existing files are preserved.",
+    "元のファイルを戻せませんでした。同じパスの既存ファイル、ボリュームの書き込み制限、アクセス権を確認してください。既存ファイルは保持します。",
+    "无法恢复源文件。请检查原路径是否已有文件、卷是否只读或是否存在访问限制。已有文件将被保留。",
+  ],
+  recoveryLink: [
+    "A symbolic link was rejected. Check the affected path without replacing existing files.",
+    "シンボリックリンクを検出して処理を止めました。既存ファイルを置き換えずに対象パスを確認してください。",
+    "检测到符号链接，已停止处理。请检查路径，不要替换已有文件。",
+  ],
+  recoveryUnavailable: [
+    "The original or retained source is unavailable. Reconnect its volume and check the paths before retrying.",
+    "元ファイルまたは待避した元ファイルを確認できません。ボリュームを接続し、パスを確認して再試行してください。",
+    "无法访问原文件或保留的源文件。请连接卷并检查路径后重试。",
+  ],
+  recoveryAccess: [
+    "Recovery stopped because a path, volume or database could not be accessed. Check the technical details and reconnect the volume if needed.",
+    "パス・ボリューム・データベースへのアクセスで復旧が止まりました。診断の詳細を確認し、必要に応じてボリュームを接続してください。",
+    "访问路径、卷或数据库时恢复停止。请查看技术详情，必要时重新连接卷。",
+  ],
+  state_verified: ["Hash matches", "ハッシュ一致", "哈希一致"],
+  state_mismatch: ["Hash mismatch", "ハッシュ不一致", "哈希不一致"],
+  integrity_checked: [
+    "Integrity checked",
+    "隔離データの整合性を確認",
+    "已检查隔离数据完整性",
+  ],
+
   downloadPolicy: [
     "Download retention and limit",
     "ダウンロードの保持期間と上限",

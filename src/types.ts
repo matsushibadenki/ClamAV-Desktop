@@ -82,9 +82,17 @@ export interface QuarantineDetail {
   item: QuarantineItem;
   original: FileState;
   stored: FileState;
+  integrity: {
+    checkedAt: string;
+    state: string;
+    actualDigest: string | null;
+    error: string | null;
+  } | null;
   transfers: {
     kind: string;
     published: boolean;
+    lastError: string | null;
+    attemptedAt: string | null;
     source: FileState;
     destination: FileState;
     staged: FileState;

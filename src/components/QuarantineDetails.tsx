@@ -7,6 +7,23 @@ export function statusLabel(status: string, t: T) {
   const key = `state_${status}`;
   return isCopyKey(key) ? t(key) : t("state_unknown");
 }
+function recoveryReason(reason: string, t: T) {
+  if (
+    reason.includes("transfer_source_changed") ||
+    reason.includes("transfer_destination_changed") ||
+    reason.includes("transfer_temporary_changed")
+  )
+    return t("recoveryChanged");
+  if (reason.includes("transfer_needs_review")) return t("recoveryAmbiguous");
+  if (reason.includes("file_move_failed")) return t("recoveryConflict");
+  if (reason.includes("symlink")) return t("recoveryLink");
+  if (
+    reason.includes("transfer_source_unavailable") ||
+    reason.includes("os error 2)")
+  )
+    return t("recoveryUnavailable");
+  return t("recoveryAccess");
+}
 function FileInfo({
   file,
   label,
@@ -36,6 +53,8 @@ export default function QuarantineDetails({
   close,
   refresh,
   pending,
+  verify,
+  recover,
 }: {
   detail: QuarantineDetail;
   t: T;
@@ -43,6 +62,8 @@ export default function QuarantineDetails({
   close: () => void;
   refresh: () => void;
   pending: boolean;
+  verify: () => void;
+  recover: () => void;
 }) {
   return (
     <Modal title={t("quarantineDetails")} close={close} closeLabel={t("close")}>
@@ -67,6 +88,39 @@ export default function QuarantineDetails({
         <FileInfo file={detail.original} label={t("originalFile")} t={t} />
         <FileInfo file={detail.stored} label={t("storedFile")} t={t} />
       </dl>
+      <section className="transfer-detail">
+        <h3>{t("integrityTitle")}</h3>
+        <p className="helper">{t("integrityHelp")}</p>
+        {detail.integrity ? (
+          <dl className="detail-list">
+            <div>
+              <dt>{t("status")}</dt>
+              <dd>{statusLabel(detail.integrity.state, t)}</dd>
+            </div>
+            <div>
+              <dt>{t("lastIntegrityCheck")}</dt>
+              <dd>{date(detail.integrity.checkedAt, language)}</dd>
+            </div>
+            {detail.integrity.actualDigest && (
+              <div>
+                <dt>{t("actualHash")}</dt>
+                <dd className="path">{detail.integrity.actualDigest}</dd>
+              </div>
+            )}
+            {detail.integrity.error && (
+              <div>
+                <dt>{t("diagnosticDetails")}</dt>
+                <dd className="path">{detail.integrity.error}</dd>
+              </div>
+            )}
+          </dl>
+        ) : (
+          <p>{t("integrityNotChecked")}</p>
+        )}
+        <button className="secondary" disabled={pending} onClick={verify}>
+          {t("verifyIntegrity")}
+        </button>
+      </section>
       <h3>{t("transferDetails")}</h3>
       {detail.transfers.length ? (
         detail.transfers.map((transfer, i) => (
@@ -75,6 +129,19 @@ export default function QuarantineDetails({
               {transfer.kind === "restore" ? t("restore") : t("quarantine")} ·{" "}
               {transfer.published ? t("copyPublished") : t("copyUncommitted")}
             </p>
+            {transfer.lastError && (
+              <div className="recovery-reason" role="status">
+                <strong>{t("recoveryReason")}</strong>
+                <p>{recoveryReason(transfer.lastError, t)}</p>
+                {transfer.attemptedAt && (
+                  <small>{date(transfer.attemptedAt, language)}</small>
+                )}
+                <details>
+                  <summary>{t("diagnosticDetails")}</summary>
+                  <p className="path">{transfer.lastError}</p>
+                </details>
+              </div>
+            )}
             <dl className="detail-list">
               <FileInfo
                 file={transfer.source}
@@ -101,6 +168,11 @@ export default function QuarantineDetails({
         ))
       ) : (
         <p>{t("noTransfer")}</p>
+      )}
+      {detail.transfers.length > 0 && (
+        <button className="secondary" disabled={pending} onClick={recover}>
+          {t("retryRecovery")}
+        </button>
       )}
       <div className="modal-actions">
         <button className="secondary" disabled={pending} onClick={refresh}>

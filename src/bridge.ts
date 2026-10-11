@@ -59,6 +59,7 @@ type Command =
   | "get_download_cache"
   | "cleanup_download_cache"
   | "get_quarantine_detail"
+  | "verify_quarantine_integrity"
   | "refresh_engine"
   | "prepare_installer"
   | "open_installer"

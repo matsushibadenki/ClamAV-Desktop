@@ -19,6 +19,10 @@ pub struct Journal {
     temporary_dir: PathBuf,
     digest: String,
     published: bool,
+    #[serde(default)]
+    last_error: Option<String>,
+    #[serde(default)]
+    attempted_at: Option<String>,
 }
 impl Journal {
     fn staged(&self) -> PathBuf {
@@ -149,6 +153,8 @@ pub fn prepare(
         destination: destination.into(),
         digest: hash.into(),
         published: false,
+        last_error: None,
+        attempted_at: None,
     };
     // Establish ownership before journalling; no existing directory is reused.
     create_private(&j.staging_dir, kind == "quarantine")?;
@@ -276,7 +282,7 @@ pub fn recover(db: &Connection) -> Result<Vec<String>> {
             .collect::<Result<_>>()?
     };
     let mut pending = vec![];
-    for j in journals {
+    for mut j in journals {
         let state: Option<String> = db
             .query_row("SELECT json FROM quarantine WHERE id=?1", [&j.owner], |r| {
                 r.get(0)
@@ -293,7 +299,10 @@ pub fn recover(db: &Connection) -> Result<Vec<String>> {
         } else {
             rollback(db, &j)
         };
-        if result.is_err() {
+        if let Err(reason) = result {
+            j.last_error = Some(reason);
+            j.attempted_at = Some(now());
+            j.save(db)?;
             pending.push(j.owner);
         } else if !committed {
             if let Some(q) = &mut item {
@@ -312,7 +321,18 @@ pub fn recover(db: &Connection) -> Result<Vec<String>> {
 pub fn details(
     db: &Connection,
     owner: &str,
-) -> Result<Vec<(String, bool, PathBuf, PathBuf, PathBuf, PathBuf)>> {
+) -> Result<
+    Vec<(
+        String,
+        bool,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+        Option<String>,
+        Option<String>,
+    )>,
+> {
     let journals: Vec<Journal> = read_rows(db, "file_transfers")?;
     Ok(journals
         .into_iter()
@@ -327,6 +347,8 @@ pub fn details(
                 j.destination,
                 staged,
                 temporary,
+                j.last_error,
+                j.attempted_at,
             )
         })
         .collect())
@@ -531,6 +553,16 @@ mod tests {
         let j = prepare(&db, "owner", "quarantine", &src, &dest, &hash, |_| Ok(())).unwrap();
         fs::write(&src, b"new user file").unwrap();
         assert_eq!(recover(&db).unwrap(), vec!["owner"]);
+        let saved: Vec<Journal> = read_rows(&db, "file_transfers").unwrap();
+        assert!(saved[0]
+            .last_error
+            .as_ref()
+            .unwrap()
+            .contains("file_move_failed"));
+        assert!(saved[0].attempted_at.is_some());
+        let detail = details(&db, "owner").unwrap();
+        assert_eq!(detail[0].6, saved[0].last_error);
+        assert!(details(&db, "another-owner").unwrap().is_empty());
         assert_eq!(fs::read(&src).unwrap(), b"new user file");
         assert!(matches(&j.staged(), &hash));
         assert!(matches(&dest, &hash));

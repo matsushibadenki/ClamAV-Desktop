@@ -153,6 +153,25 @@ export default function Quarantine({
           close={() => setDetail(null)}
           refresh={() => void showDetail(detail.item.id)}
           pending={pending}
+          verify={() =>
+            void run(async () =>
+              setDetail(
+                await command<QuarantineDetail>("verify_quarantine_integrity", {
+                  id: detail.item.id,
+                }),
+              ),
+            )
+          }
+          recover={() =>
+            void run(async () => {
+              await command("recover_file_transfers");
+              setDetail(
+                await command<QuarantineDetail>("get_quarantine_detail", {
+                  id: detail.item.id,
+                }),
+              );
+            })
+          }
         />
       )}
       {restore && (

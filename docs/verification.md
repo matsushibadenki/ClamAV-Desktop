@@ -39,3 +39,10 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Frontend: 3 tests passed. Search tests cover Unicode normalization, multiple query terms, translated status, completion filtering, attention/date ordering and preservation of the shared snapshot array.
 - Native release app at tauri://localhost: existing settings loaded with 30-day/1024-MiB defaults; new numeric fields and policy explanation rendered. Japanese/English search input, no-results feedback, clearing search and selecting attention order were exercised. Screenshots confirmed readable layout at 1180 × 800. Setting changes in the user's normal data were not saved; persistence is covered by the Rust settings serialization and existing SQLite settings path.
 - Release app, ad-hoc signing and DMG integrity checks passed. Narrow-window rendering and native console logs were not inspected for this change.
+
+## Manual integrity and recovery diagnostics
+
+- Rust tests cover match, mismatch, absent file and symbolic-link rejection without altering the source. Existing conflict-recovery test also checks persisted failure text, attempt timestamp and owner-scoped detail retrieval.
+- Native debug UI used an isolated harmless `/private/tmp/clamav-integrity-qa` fixture. SHA-256 confirmation rendered a matching result, then a mismatch after changing only the fixture. Both results were read back from SQLite. The changed fixture remained intact.
+- Missing-volume recovery failure rendered an expandable OS diagnostic. Retrying from details updated its persisted attempt timestamp while preserving the file. Native screenshots at 1180 × 800 confirmed readable hashing results and scrolling diagnostics.
+- Verification is a timestamped hash comparison, not a malware rescan. Long checks currently run to completion; cancellation, live byte progress, narrow-window QA and native console capture remain outside this change.

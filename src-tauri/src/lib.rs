@@ -114,6 +114,20 @@ async fn get_quarantine_detail(app: AppHandle, id: String) -> Result<details::De
         .map_err(err)?
 }
 #[tauri::command]
+async fn verify_quarantine_integrity(
+    app: AppHandle,
+    window: WebviewWindow,
+    id: String,
+) -> Result<details::Detail> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        details::verify(&app, &id)?;
+        details::get(&core(&app), &id)
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
 fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
     main_window(&window)?;
     if !["ja", "en", "zh-CN"].contains(&settings.language.as_str())
@@ -248,6 +262,7 @@ pub fn run() {
             get_download_cache,
             cleanup_download_cache,
             get_quarantine_detail,
+            verify_quarantine_integrity,
             refresh_engine,
             prepare_installer,
             open_installer,

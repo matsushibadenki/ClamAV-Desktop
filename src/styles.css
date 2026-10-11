@@ -1100,3 +1100,17 @@ nav button.active {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.recovery-reason {
+  border-left: 3px solid var(--color-accent);
+  padding: 12px 16px;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.recovery-reason summary {
+  cursor: pointer;
+  margin-top: 12px;
+}
+.recovery-reason p {
+  margin: 8px 0;
+}

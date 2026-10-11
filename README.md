@@ -72,3 +72,9 @@ Settings shows installer cache usage and lets you remove managed attempts unchan
 Configure retention (1–365 days) and the managed download limit (257–16,384 MiB). New downloads reserve space for the maximum package and signature; existing files are never automatically deleted. Search quarantine by path, detection or localized status and sort by date, path or attention needed.
 
 可设置保留期限（1–365天）与托管下载容量上限（257–16,384 MiB）。新下载预留安装包及签名的最大空间；不会自动删除已有文件。隔离列表支持按路径、检测名称或本地化状态搜索，并按日期、路径或处理优先级排序。
+
+隔離の詳細から「SHA-256を再確認」を実行できます。最終確認日時・一致/不一致・実測ハッシュを保存します。ウイルスの再検査や自動削除は行いません。未完了転送では直近の復旧失敗の理由、試行日時、診断詳細を確認し、復旧を再試行できます。
+
+Quarantine details can recheck SHA-256 and save the timestamp, comparison result and measured hash. This does not rescan for malware or delete files. Unfinished transfers show the last recovery failure, attempt time, expandable diagnostics and a retry action.
+
+隔离详情可重新检查SHA-256，并保存检查时间、比较结果及实际哈希值。此操作不重新扫描病毒，也不删除文件。未完成的传输显示最近恢复失败的原因、尝试时间及可展开的诊断信息，并支持重试。
