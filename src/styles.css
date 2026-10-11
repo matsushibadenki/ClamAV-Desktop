@@ -1114,3 +1114,21 @@ nav button.active {
 .recovery-reason p {
   margin: 8px 0;
 }
+
+.integrity-progress {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+.integrity-progress p {
+  margin: 0;
+}
+.integrity-progress progress {
+  width: 100%;
+}
+.integrity-progress button {
+  justify-self: start;
+}

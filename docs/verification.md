@@ -46,3 +46,10 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Native debug UI used an isolated harmless `/private/tmp/clamav-integrity-qa` fixture. SHA-256 confirmation rendered a matching result, then a mismatch after changing only the fixture. Both results were read back from SQLite. The changed fixture remained intact.
 - Missing-volume recovery failure rendered an expandable OS diagnostic. Retrying from details updated its persisted attempt timestamp while preserving the file. Native screenshots at 1180 × 800 confirmed readable hashing results and scrolling diagnostics.
 - Verification is a timestamped hash comparison, not a malware rescan. Long checks currently run to completion; cancellation, live byte progress, narrow-window QA and native console capture remain outside this change.
+
+## Quarantine export and interruptible integrity checks
+
+- Rust tests cover cancellation after the first 64KiB block, monotonic byte progress, a null partial digest, unchanged file contents, and exports containing both cancelled and restored records. Export tests verify protected original/database destinations and busy file-gate rejection.
+- Native debug QA uses an isolated harmless 8GiB sparse file. The UI showed byte/percentage progress and stopped at 66.50MiB, then displayed a cancelled result with no measured hash. The source size remained unchanged.
+- Native save dialog exported to a dedicated /private/tmp JSON file. Parsing verified schemaVersion=1 and all 3 records, including a cancelled integrity result, an existing verified result, and a restored record excluded by the UI filter. Output permissions were 0600.
+- Verification stops between read operations; OS-blocked disk I/O can delay acknowledgement. The result-saving phase is not interruptible. Narrow-window and console QA remain unverified for this change.

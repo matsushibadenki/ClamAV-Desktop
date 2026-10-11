@@ -1,3 +1,4 @@
+import IntegrityProgress from "./components/IntegrityProgress";
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -71,19 +72,21 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key = detail.includes("download_cache_limit_exceeded")
-        ? "cacheLimitExceeded"
-        : detail.includes("transfer_insufficient_space")
-          ? "insufficientSpace"
-          : detail === "desktop_required"
-            ? "desktopRequired"
-            : detail.includes("file_changed")
-              ? "fileChanged"
-              : detail.includes("restore_destination_exists")
-                ? "destinationExists"
-                : detail === "busy"
-                  ? "busy"
-                  : "operationError";
+      const key = detail.includes("export_protected_path")
+        ? "exportProtectedPath"
+        : detail.includes("download_cache_limit_exceeded")
+          ? "cacheLimitExceeded"
+          : detail.includes("transfer_insufficient_space")
+            ? "insufficientSpace"
+            : detail === "desktop_required"
+              ? "desktopRequired"
+              : detail.includes("file_changed")
+                ? "fileChanged"
+                : detail.includes("restore_destination_exists")
+                  ? "destinationExists"
+                  : detail === "busy"
+                    ? "busy"
+                    : "operationError";
       setNotice({ key, detail, error: true });
       return false;
     } finally {
@@ -200,33 +203,38 @@ export default function App() {
                 <span>{t("preview")}</span>
               </div>
             )}
-            {data.operation && (
-              <section className="operation" aria-live="polite">
-                <LoaderCircle size={21} className="spin" />
-                <div>
-                  <strong>
-                    {isCopyKey(data.operation.stage)
-                      ? t(data.operation.stage)
-                      : data.operation.stage}
-                  </strong>
-                  {data.operation.stage === "downloading" && (
-                    <small>
-                      {(data.operation.downloaded / 1024 / 1024).toFixed(1)} MB
-                      {data.operation.total
-                        ? ` / ${(data.operation.total / 1024 / 1024).toFixed(1)} MB`
-                        : ""}
-                    </small>
-                  )}
-                  {data.operation.message && <p>{data.operation.message}</p>}
-                </div>
-                {data.operation.stage === "downloading" &&
-                  data.operation.total && (
-                    <progress
-                      value={data.operation.downloaded}
-                      max={data.operation.total}
-                    />
-                  )}
-              </section>
+            {data.operation?.kind === "integrity" ? (
+              <IntegrityProgress operation={data.operation} t={t} />
+            ) : (
+              data.operation && (
+                <section className="operation" aria-live="polite">
+                  <LoaderCircle size={21} className="spin" />
+                  <div>
+                    <strong>
+                      {isCopyKey(data.operation.stage)
+                        ? t(data.operation.stage)
+                        : data.operation.stage}
+                    </strong>
+                    {data.operation.stage === "downloading" && (
+                      <small>
+                        {(data.operation.downloaded / 1024 / 1024).toFixed(1)}{" "}
+                        MB
+                        {data.operation.total
+                          ? ` / ${(data.operation.total / 1024 / 1024).toFixed(1)} MB`
+                          : ""}
+                      </small>
+                    )}
+                    {data.operation.message && <p>{data.operation.message}</p>}
+                  </div>
+                  {data.operation.stage === "downloading" &&
+                    data.operation.total && (
+                      <progress
+                        value={data.operation.downloaded}
+                        max={data.operation.total}
+                      />
+                    )}
+                </section>
+              )
             )}
             {page === "home" ? (
               <Home {...props} />

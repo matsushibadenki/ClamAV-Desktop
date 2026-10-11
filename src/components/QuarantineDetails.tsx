@@ -1,5 +1,6 @@
+import IntegrityProgress from "./IntegrityProgress";
 import Modal from "./Modal";
-import type { FileState, Language, QuarantineDetail } from "../types";
+import type { FileState, Language, QuarantineDetail, Snapshot } from "../types";
 import { date, isCopyKey } from "../i18n";
 import type { T } from "./shared";
 import { bytes } from "./DownloadCache";
@@ -55,6 +56,7 @@ export default function QuarantineDetails({
   pending,
   verify,
   recover,
+  operation,
 }: {
   detail: QuarantineDetail;
   t: T;
@@ -64,6 +66,7 @@ export default function QuarantineDetails({
   pending: boolean;
   verify: () => void;
   recover: () => void;
+  operation: Snapshot["operation"];
 }) {
   return (
     <Modal title={t("quarantineDetails")} close={close} closeLabel={t("close")}>
@@ -107,6 +110,15 @@ export default function QuarantineDetails({
                 <dd className="path">{detail.integrity.actualDigest}</dd>
               </div>
             )}
+            {detail.integrity.totalBytes !== null && (
+              <div>
+                <dt>{t("checkedBytes")}</dt>
+                <dd>
+                  {bytes(detail.integrity.bytesChecked)} /{" "}
+                  {bytes(detail.integrity.totalBytes)}
+                </dd>
+              </div>
+            )}
             {detail.integrity.error && (
               <div>
                 <dt>{t("diagnosticDetails")}</dt>
@@ -117,7 +129,15 @@ export default function QuarantineDetails({
         ) : (
           <p>{t("integrityNotChecked")}</p>
         )}
-        <button className="secondary" disabled={pending} onClick={verify}>
+        {operation?.kind === "integrity" &&
+          operation.targetId === detail.item.id && (
+            <IntegrityProgress operation={operation} t={t} />
+          )}
+        <button
+          className="secondary"
+          disabled={pending || !!operation}
+          onClick={verify}
+        >
           {t("verifyIntegrity")}
         </button>
       </section>

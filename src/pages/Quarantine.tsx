@@ -1,7 +1,7 @@
 import { Archive, RotateCcw } from "lucide-react";
 import { quarantineList, type QuarantineSort } from "../quarantine-list";
 import { useState } from "react";
-import { command } from "../bridge";
+import { command, desktop } from "../bridge";
 import { date } from "../i18n";
 import { Empty, type ViewProps } from "../components/shared";
 import Modal from "../components/Modal";
@@ -39,6 +39,18 @@ export default function Quarantine({
       <header className="page-heading">
         <h1>{t("quarantineTitle")}</h1>
         <p>{t("quarantineDesc")}</p>
+        <button
+          className="secondary"
+          disabled={pending || !desktop || !!data.operation}
+          onClick={() =>
+            void run(async () => {
+              await command("export_quarantine");
+            })
+          }
+        >
+          {t("exportQuarantine")}
+        </button>
+        <p className="helper">{t("exportQuarantineHelp")}</p>
       </header>
       <div className="quarantine-filters">
         <label className="field">
@@ -153,15 +165,19 @@ export default function Quarantine({
           close={() => setDetail(null)}
           refresh={() => void showDetail(detail.item.id)}
           pending={pending}
-          verify={() =>
-            void run(async () =>
-              setDetail(
-                await command<QuarantineDetail>("verify_quarantine_integrity", {
-                  id: detail.item.id,
-                }),
-              ),
-            )
-          }
+          operation={data.operation}
+          verify={() => {
+            const id = detail.item.id;
+            void run(async () => {
+              const next = await command<QuarantineDetail>(
+                "verify_quarantine_integrity",
+                { id },
+              );
+              setDetail((current) =>
+                current?.item.id === id ? next : current,
+              );
+            });
+          }}
           recover={() =>
             void run(async () => {
               await command("recover_file_transfers");

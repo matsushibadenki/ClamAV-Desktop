@@ -78,3 +78,9 @@ Configure retention (1–365 days) and the managed download limit (257–16,384 
 Quarantine details can recheck SHA-256 and save the timestamp, comparison result and measured hash. This does not rescan for malware or delete files. Unfinished transfers show the last recovery failure, attempt time, expandable diagnostics and a retry action.
 
 隔离详情可重新检查SHA-256，并保存检查时间、比较结果及实际哈希值。此操作不重新扫描病毒，也不删除文件。未完成的传输显示最近恢复失败的原因、尝试时间及可展开的诊断信息，并支持重试。
+
+隔離一覧から全記録と最終確認結果をJSON出力できます。検索条件は出力に適用しません。整合性確認中は容量・割合を表示し、「確認を停止」で中断できます。中断結果に途中ハッシュは含めず、ファイルは保持します。
+
+Export all quarantine records and latest integrity results as JSON regardless of search filters. Integrity checks show byte/percentage progress and can be stopped. Stopped checks retain the file and never publish a partial digest.
+
+可将全部隔离记录及最近完整性结果导出为JSON，不应用搜索筛选。完整性检查显示容量与百分比进度，并支持停止。停止的检查保留文件，不输出未完成的哈希值。

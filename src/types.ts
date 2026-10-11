@@ -56,6 +56,7 @@ export interface Snapshot {
   operation: {
     kind: string;
     stage: string;
+    targetId: string | null;
     downloaded: number;
     total: number | null;
     message: string | null;
@@ -87,6 +88,8 @@ export interface QuarantineDetail {
     state: string;
     actualDigest: string | null;
     error: string | null;
+    bytesChecked: number;
+    totalBytes: number | null;
   } | null;
   transfers: {
     kind: string;

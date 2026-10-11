@@ -18,6 +18,7 @@ pub struct Core {
     pub db: Mutex<Connection>,
     pub root: PathBuf,
     pub cancel: AtomicBool,
+    pub integrity_cancel: AtomicBool,
     pub file_gate: Mutex<()>,
     pub prepared: Mutex<Option<(PathBuf, String)>>,
 }
@@ -83,6 +84,7 @@ impl Core {
             db: Mutex::new(db),
             root,
             cancel: AtomicBool::new(false),
+            integrity_cancel: AtomicBool::new(false),
             file_gate: Mutex::new(()),
             prepared: Mutex::new(None),
         })

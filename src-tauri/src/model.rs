@@ -87,6 +87,7 @@ pub struct Activity {
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     pub kind: String,
+    pub target_id: Option<String>,
     pub stage: String,
     pub downloaded: u64,
     pub total: Option<u64>,

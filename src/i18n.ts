@@ -1,6 +1,45 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  stopIntegrity: ["Stop check", "確認を停止", "停止检查"],
+  exportProtectedPath: [
+    "Choose a location outside app storage and original file paths.",
+    "アプリ保存領域と元ファイル以外の出力先を選んでください。",
+    "请选择应用存储和原文件路径之外的位置。",
+  ],
+  finishingIntegrity: [
+    "Saving check result…",
+    "確認結果を保存中…",
+    "正在保存检查结果…",
+  ],
+  checkingIntegrity: [
+    "Checking SHA-256…",
+    "SHA-256を確認中…",
+    "正在检查SHA-256…",
+  ],
+  stoppingIntegrity: [
+    "Stopping integrity check…",
+    "整合性確認を停止中…",
+    "正在停止完整性检查…",
+  ],
+  integrityProgress: [
+    "Integrity check progress",
+    "整合性確認の進捗",
+    "完整性检查进度",
+  ],
+  checkedBytes: ["Bytes checked", "確認した容量", "已检查容量"],
+  state_cancelled: ["Check stopped", "確認を停止しました", "检查已停止"],
+  exportQuarantine: [
+    "Export quarantine JSON",
+    "隔離記録をJSON出力",
+    "导出隔离记录JSON",
+  ],
+  exportQuarantineHelp: [
+    "Export all records, including restored/failed attempts, latest integrity results and unfinished transfer diagnostics. Search filters are not applied.",
+    "復元済み・失敗済みを含む全記録、最終確認結果、未完了転送の診断情報を出力します。検索条件は適用しません。",
+    "导出全部记录，包括已恢复或失败的记录、最近完整性结果及未完成传输的诊断信息。不应用搜索筛选。",
+  ],
+
   integrityTitle: [
     "Quarantine integrity",
     "隔離データの整合性",

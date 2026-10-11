@@ -128,6 +128,45 @@ async fn verify_quarantine_integrity(
     .map_err(err)?
 }
 #[tauri::command]
+fn stop_integrity_check(app: AppHandle, window: WebviewWindow) -> Result<()> {
+    main_window(&window)?;
+    let c = core(&app);
+    {
+        let mut d = c.document.lock().unwrap();
+        if let Some(op) = d
+            .operation
+            .as_mut()
+            .filter(|op| op.kind == "integrity" && op.stage != "finishingIntegrity")
+        {
+            c.integrity_cancel.store(true, Ordering::Relaxed);
+            op.stage = "stoppingIntegrity".into();
+        }
+    }
+    c.publish(&app);
+    Ok(())
+}
+#[tauri::command]
+async fn export_quarantine(app: AppHandle, window: WebviewWindow) -> Result<Option<String>> {
+    main_window(&window)?;
+    let Some(file) = rfd::AsyncFileDialog::new()
+        .set_file_name("clamav-quarantine.json")
+        .add_filter("JSON", &["json"])
+        .save_file()
+        .await
+    else {
+        return Ok(None);
+    };
+    let destination = file.path().to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = core(&app);
+        let bytes = serde_json::to_vec_pretty(&details::export(&c)?).map_err(err)?;
+        details::write_export(&c, &destination, &bytes)?;
+        Ok(Some(destination.to_string_lossy().into()))
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
 fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
     main_window(&window)?;
     if !["ja", "en", "zh-CN"].contains(&settings.language.as_str())
@@ -263,6 +302,8 @@ pub fn run() {
             cleanup_download_cache,
             get_quarantine_detail,
             verify_quarantine_integrity,
+            stop_integrity_check,
+            export_quarantine,
             refresh_engine,
             prepare_installer,
             open_installer,
