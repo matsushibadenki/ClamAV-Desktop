@@ -2,7 +2,7 @@ use crate::{model::*, scanner, store::*};
 use std::{fs, path::Path};
 use tauri::AppHandle;
 #[cfg(target_os = "macos")]
-fn move_exclusive(from: &Path, to: &Path) -> Result<()> {
+pub(crate) fn move_exclusive(from: &Path, to: &Path) -> Result<()> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
     let from = CString::new(from.as_os_str().as_bytes()).map_err(err)?;
     let to = CString::new(to.as_os_str().as_bytes()).map_err(err)?;
@@ -16,10 +16,10 @@ fn move_exclusive(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 #[cfg(not(target_os = "macos"))]
-fn move_exclusive(_from: &Path, _to: &Path) -> Result<()> {
+pub(crate) fn move_exclusive(_from: &Path, _to: &Path) -> Result<()> {
     Err("macos_only".into())
 }
-fn safe_path(path: &Path) -> Result<()> {
+pub(crate) fn safe_path(path: &Path) -> Result<()> {
     if !path.is_absolute() {
         return Err("invalid_path".into());
     }
@@ -78,11 +78,34 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
         status: "moving".into(),
     };
     save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-    if let Err(e) = move_exclusive(source, &dest) {
-        item.status = "move_failed".into();
-        save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-        return Err(e);
-    }
+    let transfer = if crate::file_transfer::different_volume(source, &dest)? {
+        let snapshot = c.snapshot();
+        let prepared = crate::file_transfer::prepare(
+            &c.db.lock().unwrap(),
+            id,
+            "quarantine",
+            source,
+            &dest,
+            &item.digest,
+            |p| confirm_detection(&snapshot, p, &item.signature),
+        );
+        match prepared {
+            Ok(j) => Some(j),
+            Err(e) => {
+                item.status = "move_failed".into();
+                save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+                refresh_items(app)?;
+                return Err(e);
+            }
+        }
+    } else {
+        if let Err(e) = move_exclusive(source, &dest) {
+            item.status = "move_failed".into();
+            save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+            return Err(e);
+        }
+        None
+    };
     if scanner::digest(&dest)? != item.digest {
         let rollback = move_exclusive(&dest, source);
         item.status = "changed".into();
@@ -96,7 +119,11 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
     }
     // Re-scan the moved, private file to bind the detection to the exact bytes
     // being quarantined. The source could have changed while ClamAV was scanning.
-    if let Err(reason) = confirm_detection(&c.snapshot(), &dest, &item.signature) {
+    if let Err(reason) = if transfer.is_some() {
+        Ok(())
+    } else {
+        confirm_detection(&c.snapshot(), &dest, &item.signature)
+    } {
         match move_exclusive(&dest, source) {
             Ok(()) => {
                 #[cfg(unix)]
@@ -120,6 +147,13 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
     }
     item.status = "active".into();
     save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+    if let Some(j) = transfer {
+        let finished = crate::file_transfer::finish(&c.db.lock().unwrap(), &j);
+        if let Err(e) = finished {
+            refresh_items(app)?;
+            return Err(e);
+        }
+    }
     {
         let mut d = c.document.lock().unwrap();
         d.quarantine.retain(|q| q.id != id);
@@ -166,11 +200,33 @@ pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
     let original_status = item.status.clone();
     item.status = "restoring".into();
     save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-    if let Err(e) = move_exclusive(&source, dest) {
-        item.status = original_status;
-        save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-        return Err(e);
-    }
+    let transfer = if crate::file_transfer::different_volume(&source, dest)? {
+        let prepared = crate::file_transfer::prepare(
+            &c.db.lock().unwrap(),
+            id,
+            "restore",
+            &source,
+            dest,
+            &item.digest,
+            |_| Ok(()),
+        );
+        match prepared {
+            Ok(j) => Some(j),
+            Err(e) => {
+                item.status = original_status;
+                save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+                refresh_items(app)?;
+                return Err(e);
+            }
+        }
+    } else {
+        if let Err(e) = move_exclusive(&source, dest) {
+            item.status = original_status;
+            save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+            return Err(e);
+        }
+        None
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -178,12 +234,20 @@ pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
     }
     item.status = "restored".into();
     save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
+    if let Some(j) = transfer {
+        let finished = crate::file_transfer::finish(&c.db.lock().unwrap(), &j);
+        if let Err(e) = finished {
+            refresh_items(app)?;
+            return Err(e);
+        }
+    }
     {
         let mut d = c.document.lock().unwrap();
         if let Some(q) = d.quarantine.iter_mut().find(|q| q.id == id) {
             *q = item.clone();
         }
     }
+    refresh_items(app)?;
     c.log(app, "file_restored", dest.to_string_lossy());
     Ok(())
 }
@@ -241,6 +305,11 @@ pub fn reconcile(
             "moving" | "restoring" | "active" | "review"
         ) {
             if source.is_file() {
+                if safe_path(&source).is_err() {
+                    item.status = "integrity_error".into();
+                    save_row(db, "quarantine", &item.id, item)?;
+                    continue;
+                }
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
@@ -259,7 +328,7 @@ pub fn reconcile(
                 }
             } else if item.status == "restoring"
                 && Path::new(&item.original_path).is_file()
-                && scanner::digest(Path::new(&item.original_path))? == item.digest
+                && scanner::digest(Path::new(&item.original_path)).is_ok_and(|h| h == item.digest)
             {
                 item.status = "restored".into();
             } else if item.status == "moving" {
@@ -270,6 +339,44 @@ pub fn reconcile(
             save_row(db, "quarantine", &item.id, item)?;
         }
     }
+    Ok(())
+}
+
+pub fn refresh_items(app: &AppHandle) -> Result<()> {
+    let c = core(app);
+    let db = c.db.lock().unwrap();
+    let pending = crate::file_transfer::recover(&db)?;
+    let mut items: Vec<QuarantineItem> = crate::store::read_rows(&db, "quarantine")?;
+    reconcile(&c.root, &db, &mut items)?;
+    for item in &mut items {
+        if pending.contains(&item.id) {
+            item.status = "transfer_pending".into();
+        }
+    }
+    drop(db);
+    items.sort_by(|a, b| b.quarantined_at.cmp(&a.quarantined_at));
+    {
+        let mut d = c.document.lock().unwrap();
+        for scan in &mut d.history {
+            for finding in &mut scan.findings {
+                finding.quarantined = items.iter().any(|q| {
+                    q.id == finding.id
+                        && matches!(q.status.as_str(), "active" | "review" | "transfer_pending")
+                });
+            }
+            c.save_scan(scan)?;
+        }
+        if let Some(scan) = &mut d.scan {
+            for finding in &mut scan.findings {
+                finding.quarantined = items.iter().any(|q| {
+                    q.id == finding.id
+                        && matches!(q.status.as_str(), "active" | "review" | "transfer_pending")
+                });
+            }
+        }
+        d.quarantine = items;
+    }
+    c.publish(app);
     Ok(())
 }
 

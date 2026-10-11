@@ -1,6 +1,12 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  transferPending: [
+    "Transfer recovery is pending. Reconnect the original volume and retry. Existing files will not be overwritten.",
+    "転送の復旧を保留しています。元のボリュームを接続して再試行してください。既存ファイルは上書きしません。",
+    "传输恢复待处理。请重新连接原卷并重试。不会覆盖现有文件。",
+  ],
+  retryRecovery: ["Retry recovery", "復旧を再試行", "重试恢复"],
   home: ["Home", "ホーム", "首页"],
   scan: ["Scan", "スキャン", "扫描"],
   quarantine: ["Quarantine", "隔離", "隔离"],

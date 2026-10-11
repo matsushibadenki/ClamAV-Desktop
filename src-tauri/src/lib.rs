@@ -1,4 +1,5 @@
 mod engine;
+mod file_transfer;
 mod installer;
 mod model;
 mod process;
@@ -76,6 +77,17 @@ async fn restore_file(app: AppHandle, window: WebviewWindow, id: String) -> Resu
     tauri::async_runtime::spawn_blocking(move || quarantine::restore(&app, &id))
         .await
         .map_err(err)?
+}
+#[tauri::command]
+async fn recover_file_transfers(app: AppHandle, window: WebviewWindow) -> Result<()> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = core(&app);
+        let _gate = c.file_gate.lock().unwrap();
+        quarantine::refresh_items(&app)
+    })
+    .await
+    .map_err(err)?
 }
 #[tauri::command]
 fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
@@ -216,6 +228,7 @@ pub fn run() {
             choose_folder,
             quarantine_file,
             restore_file,
+            recover_file_transfers,
             save_settings,
             set_activity_panel,
             export_history,

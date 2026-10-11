@@ -63,6 +63,7 @@ type Command =
   | "choose_folder"
   | "quarantine_file"
   | "restore_file"
+  | "recover_file_transfers"
   | "save_settings"
   | "set_activity_panel"
   | "export_history"

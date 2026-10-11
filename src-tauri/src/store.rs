@@ -31,7 +31,7 @@ impl Core {
         }
         private_dir(&root)?;
         let db = Connection::open(root.join("state.sqlite")).map_err(err)?;
-        db.execute_batch("PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS runtime_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS scans (id TEXT PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS quarantine (id TEXT PRIMARY KEY, json TEXT NOT NULL);").map_err(err)?;
+        db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS file_transfers (id TEXT PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS runtime_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS scans (id TEXT PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS quarantine (id TEXT PRIMARY KEY, json TEXT NOT NULL);").map_err(err)?;
         let settings = db
             .query_row("SELECT json FROM settings WHERE id=1", [], |r| {
                 r.get::<_, String>(0)
@@ -49,8 +49,23 @@ impl Core {
             }
         }
         history.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        let pending = crate::file_transfer::recover(&db)?;
         let mut quarantine = read_rows(&db, "quarantine")?;
         crate::quarantine::reconcile(&root, &db, &mut quarantine)?;
+        for item in &mut quarantine {
+            if pending.contains(&item.id) {
+                item.status = "transfer_pending".into();
+            }
+        }
+        for scan in &mut history {
+            for finding in &mut scan.findings {
+                finding.quarantined = quarantine.iter().any(|q| {
+                    q.id == finding.id
+                        && matches!(q.status.as_str(), "active" | "review" | "transfer_pending")
+                });
+            }
+            save_row(&db, "scans", &scan.id, scan)?;
+        }
         Ok(Self {
             document: Mutex::new(Snapshot {
                 engine: Engine::default(),
@@ -97,7 +112,10 @@ impl Core {
         save_row(&self.db.lock().unwrap(), "scans", &scan.id, scan)
     }
 }
-fn read_rows<T: serde::de::DeserializeOwned>(db: &Connection, table: &str) -> Result<Vec<T>> {
+pub(crate) fn read_rows<T: serde::de::DeserializeOwned>(
+    db: &Connection,
+    table: &str,
+) -> Result<Vec<T>> {
     let mut st = db
         .prepare(&format!("SELECT json FROM {table}"))
         .map_err(err)?;

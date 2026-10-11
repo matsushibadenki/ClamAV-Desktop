@@ -20,6 +20,7 @@ node_modules/
 !.env.*.example
 *.p12
 *.pfx
+*.p8
 *.key
 
 # Logs

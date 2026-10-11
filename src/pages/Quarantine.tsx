@@ -46,16 +46,31 @@ export default function Quarantine({
                     {item.status !== "active" && ` · ${t("review")}`}
                   </small>
                 </div>
-                <button
-                  className="secondary"
-                  disabled={
-                    pending || !["active", "review"].includes(item.status)
-                  }
-                  onClick={() => setRestore(item)}
-                >
-                  <RotateCcw size={15} />
-                  {t("restore")}
-                </button>
+                {item.status === "transfer_pending" ? (
+                  <div>
+                    <p className="helper">{t("transferPending")}</p>
+                    <button
+                      className="secondary"
+                      disabled={pending}
+                      onClick={() =>
+                        void run(() => command("recover_file_transfers"))
+                      }
+                    >
+                      {t("retryRecovery")}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="secondary"
+                    disabled={
+                      pending || !["active", "review"].includes(item.status)
+                    }
+                    onClick={() => setRestore(item)}
+                  >
+                    <RotateCcw size={15} />
+                    {t("restore")}
+                  </button>
+                )}
               </article>
             ))}
           </div>
