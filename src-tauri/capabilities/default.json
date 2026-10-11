@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Local main and activity windows only; no shell or filesystem access from JavaScript.",
+  "windows": ["main", "activity"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

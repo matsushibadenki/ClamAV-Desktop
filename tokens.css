@@ -1,0 +1,41 @@
+:root {
+  --color-paper: oklch(97.89322% 0.002865 264.5421);
+  --color-surface: oklch(100% 0 89.8756);
+  --color-sidebar: oklch(95.89697% 0.005883 239.8204);
+  --color-ink: oklch(23.21918% 0.048339 261.1012);
+  --color-muted: oklch(51.17229% 0.043397 261.9461);
+  --color-rule: oklch(91.05445% 0.012682 255.5093);
+  --color-accent: oklch(54.46852% 0.092421 188.0409);
+  --color-accent-hover: oklch(48.25785% 0.08245 188.0917);
+  --color-accent-ink: oklch(100% 0 89.8756);
+  --color-soft: oklch(93.79459% 0.015914 196.8854);
+  --color-focus: oklch(43.25923% 0.118545 267.592);
+  --color-icon-muted: oklch(75.37499% 0.02303 256.7509);
+  --color-error: oklch(50.26289% 0.14782 25.5154);
+  --color-error-soft: oklch(96.61253% 0.016782 31.082);
+  --color-overlay: oklch(26.43369% 0.046292 253.2651 / 0.33333);
+  --color-shadow: oklch(26.43369% 0.046292 253.2651 / 0.08627);
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "Hiragino Sans", "PingFang SC",
+    sans-serif;
+  --font-body: var(--font-display);
+  --font-mono: "SFMono-Regular", ui-monospace, monospace;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 19px;
+  --text-display: clamp(28px, 3vw, 38px);
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-ui: var(--ease-out);
+  --dur-ui: 140ms;
+}

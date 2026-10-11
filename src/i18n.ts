@@ -1,0 +1,381 @@
+import type { Language } from "./types";
+// Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
+const copy = {
+  home: ["Home", "ホーム", "首页"],
+  scan: ["Scan", "スキャン", "扫描"],
+  quarantine: ["Quarantine", "隔離", "隔离"],
+  history: ["History", "履歴", "历史"],
+  settings: ["Settings", "設定", "设置"],
+  homeTitle: [
+    "Your Mac, in focus.",
+    "Macの状態を、ひと目で。",
+    "Mac 状态，一目了然。",
+  ],
+  homeDesc: [
+    "A clear view of your scan engine and recent activity.",
+    "スキャンエンジンと最近の操作を、わかりやすく。",
+    "清楚了解扫描引擎和最近的操作。",
+  ],
+  setupTitle: [
+    "Set up your scan engine",
+    "スキャンエンジンを準備",
+    "准备扫描引擎",
+  ],
+  setupDesc: [
+    "Install ClamAV and download definitions to start scanning.",
+    "ClamAVとウイルス定義を準備して、スキャンを始めましょう。",
+    "安装 ClamAV 并下载病毒定义，即可开始扫描。",
+  ],
+  setup: ["Set up ClamAV", "ClamAVを準備", "准备 ClamAV"],
+  readyTitle: [
+    "Ready when you are",
+    "スキャンの準備ができました",
+    "已准备好扫描",
+  ],
+  readyDesc: [
+    "Your engine and definitions are available for on-demand scans.",
+    "エンジンと定義ファイルを使用した手動スキャンが可能です。",
+    "引擎和病毒定义已就绪，可进行按需扫描。",
+  ],
+  definitionsTitle: [
+    "Download virus definitions",
+    "ウイルス定義を準備",
+    "下载病毒定义",
+  ],
+  definitionsDesc: [
+    "ClamAV is installed. Download definitions before your first scan.",
+    "ClamAVは導入済みです。初回スキャン前に定義ファイルを取得してください。",
+    "ClamAV 已安装。首次扫描前，请下载病毒定义。",
+  ],
+  engine: ["Engine", "エンジン", "引擎"],
+  definitions: ["Definitions", "ウイルス定義", "病毒定义"],
+  lastScan: ["Last scan", "最終スキャン", "上次扫描"],
+  notInstalled: ["Not installed", "未インストール", "未安装"],
+  notDownloaded: ["Not downloaded", "未ダウンロード", "未下载"],
+  noScans: ["No scans yet", "まだ実行していません", "尚未扫描"],
+  available: ["Available", "準備済み", "已就绪"],
+  checking: ["Checking…", "確認中…", "正在检查…"],
+  startScan: ["Start a scan", "スキャンを開始", "开始扫描"],
+  quick: ["Quick scan", "クイックスキャン", "快速扫描"],
+  quickDesc: [
+    "Scan your Downloads folder",
+    "ダウンロードフォルダを検査",
+    "扫描下载文件夹",
+  ],
+  custom: ["Choose a folder", "フォルダを選択", "选择文件夹"],
+  customDesc: [
+    "Select exactly what to scan",
+    "検査するフォルダを指定",
+    "指定要扫描的文件夹",
+  ],
+  full: ["Full scan", "フルスキャン", "完整扫描"],
+  fullDesc: [
+    "Scan your accessible home folder",
+    "アクセス可能なホーム領域を検査",
+    "扫描可访问的主目录",
+  ],
+  activity: ["Engine activity", "エンジンの操作ログ", "引擎活动"],
+  noActivity: ["No activity yet.", "まだ操作はありません。", "暂无活动。"],
+  noActivityDesc: [
+    "Engine activity will appear here once you set up ClamAV.",
+    "エンジンの準備やスキャンの操作がここに表示されます。",
+    "准备引擎或扫描后，活动会显示在这里。",
+  ],
+  footer: [
+    "On-demand scanning · Files are never deleted automatically.",
+    "手動・予約スキャン対応 · ファイルは自動削除しません。",
+    "支持按需和定时扫描 · 不会自动删除文件。",
+  ],
+  brandNote: [
+    "Open source. A clear view of your Mac.",
+    "オープンソースで、Macをもっとわかりやすく。",
+    "开源，让 Mac 状态更清晰。",
+  ],
+  refresh: ["Refresh engine status", "エンジン状態を再確認", "刷新引擎状态"],
+  language: ["Language", "表示言語", "语言"],
+  preview: [
+    "Browser preview · Engine operations require the desktop app.",
+    "ブラウザプレビュー · エンジン操作はデスクトップアプリで使用できます。",
+    "浏览器预览 · 引擎操作需使用桌面应用。",
+  ],
+  desktopRequired: [
+    "Open the Tauri desktop app to use this operation.",
+    "この操作はTauriデスクトップアプリで実行してください。",
+    "请在 Tauri 桌面应用中执行此操作。",
+  ],
+  scanTitle: ["Scan your files", "ファイルをスキャン", "扫描文件"],
+  scanDesc: [
+    "Choose a scope. Review detections before deciding what to quarantine.",
+    "検査範囲を選択し、検出内容を確認してから隔離できます。",
+    "选择扫描范围，查看检测结果后再决定是否隔离。",
+  ],
+  needsSetup: [
+    "Set up the engine and definitions to enable scanning.",
+    "スキャンにはエンジンと定義ファイルの準備が必要です。",
+    "请先准备引擎和病毒定义，以启用扫描。",
+  ],
+  running: ["Scanning", "スキャン中", "正在扫描"],
+  completed: ["Scan completed", "スキャン完了", "扫描完成"],
+  cancelled: ["Scan stopped", "スキャン停止", "扫描已停止"],
+  interrupted: ["Scan interrupted", "スキャン中断", "扫描已中断"],
+  failed: ["Scan failed", "スキャン失敗", "扫描失败"],
+  incomplete: ["Scan incomplete", "一部を検査できませんでした", "扫描不完整"],
+  stop: ["Stop scan", "スキャンを停止", "停止扫描"],
+  stopping: ["Stopping…", "停止中…", "正在停止…"],
+  scanned: ["Files checked", "検査済みファイル", "已检查文件"],
+  detections: ["Detections", "検出件数", "检测结果"],
+  errors: ["Not fully checked", "検査不能・制限超過", "未完整检查"],
+  elapsed: ["Elapsed", "経過時間", "已用时间"],
+  waiting: [
+    "Loading definitions…",
+    "定義ファイルを読み込み中…",
+    "正在加载病毒定义…",
+  ],
+  noDetections: [
+    "No detections reported",
+    "検出は報告されていません",
+    "未报告检测结果",
+  ],
+  noDetectionsDesc: [
+    "Results cover only files the engine could examine within configured limits.",
+    "結果は、設定上限内でエンジンが検査できたファイルに限られます。",
+    "结果仅涵盖引擎在配置限制内可检查的文件。",
+  ],
+  quarantineAction: ["Quarantine file", "ファイルを隔離", "隔离文件"],
+  quarantined: ["Quarantined", "隔離済み", "已隔离"],
+  review: ["Review detections", "検出結果を確認", "查看检测结果"],
+  quarantineTitle: ["Files in quarantine", "隔離したファイル", "已隔离的文件"],
+  quarantineDesc: [
+    "Files stay here until you choose to restore them. Nothing is deleted automatically.",
+    "復元するまで専用領域で保管します。自動削除は行いません。",
+    "文件保存在专用区域，直到您选择恢复。不会自动删除。",
+  ],
+  emptyQuarantine: [
+    "No quarantined files",
+    "隔離ファイルはありません",
+    "没有隔离文件",
+  ],
+  emptyQuarantineDesc: [
+    "Detected files appear here after you choose to quarantine them.",
+    "検出結果から隔離を選んだファイルが表示されます。",
+    "选择隔离的检测文件将显示在这里。",
+  ],
+  restore: ["Restore file", "ファイルを復元", "恢复文件"],
+  restoreTitle: [
+    "Restore this file?",
+    "このファイルを復元しますか？",
+    "恢复此文件？",
+  ],
+  restoreDesc: [
+    "The file was flagged by ClamAV. Restoring makes it accessible again. The original path will never be overwritten.",
+    "ClamAVが検出したファイルです。復元すると再びアクセス可能になります。元の場所に既存ファイルがある場合は上書きしません。",
+    "此文件被 ClamAV 标记。恢复后可再次访问。不会覆盖原路径中的现有文件。",
+  ],
+  cancel: ["Cancel", "キャンセル", "取消"],
+  restored: ["Restored", "復元済み", "已恢复"],
+  historyTitle: ["Your scan history", "スキャン履歴", "扫描历史"],
+  historyDesc: [
+    "A local record of completed, stopped, and interrupted scans.",
+    "完了・停止・中断したスキャンを、このMacに記録します。",
+    "在此 Mac 上记录已完成、已停止和已中断的扫描。",
+  ],
+  export: ["Export JSON", "JSONを書き出す", "导出 JSON"],
+  emptyHistory: [
+    "Your first scan starts here",
+    "まずはスキャンを実行",
+    "从首次扫描开始",
+  ],
+  emptyHistoryDesc: [
+    "Choose a folder to build a record of your checks.",
+    "フォルダを指定してスキャンすると、結果が記録されます。",
+    "选择文件夹并扫描，即可记录结果。",
+  ],
+  search: [
+    "Search paths or detections",
+    "パス・検出名を検索",
+    "搜索路径或检测名称",
+  ],
+  noMatches: [
+    "No matching scans",
+    "一致する履歴はありません",
+    "没有匹配的扫描",
+  ],
+  settingsTitle: [
+    "Make it work for you",
+    "使い方に合わせて設定",
+    "按您的需求设置",
+  ],
+  settingsDesc: [
+    "Manage definitions, scheduled scans, and your local data.",
+    "定義更新、予約スキャン、ローカルデータを管理します。",
+    "管理病毒定义、定时扫描和本地数据。",
+  ],
+  engineSection: ["Scan engine", "スキャンエンジン", "扫描引擎"],
+  enginePath: [
+    "Detected executable",
+    "検出した実行ファイル",
+    "检测到的可执行文件",
+  ],
+  update: ["Update definitions", "定義ファイルを更新", "更新病毒定义"],
+  reinstall: [
+    "Download official installer",
+    "公式インストーラーを取得",
+    "下载官方安装程序",
+  ],
+  autoUpdate: [
+    "Automatic definition updates",
+    "定義ファイルを自動更新",
+    "自动更新病毒定义",
+  ],
+  autoUpdateDesc: [
+    "Check every 6 hours while the app is open. FreshClam respects server cooldowns.",
+    "アプリ起動中に6時間ごとに確認します。FreshClamの更新制限に従います。",
+    "应用打开时每 6 小时检查一次。遵循 FreshClam 的服务器限制。",
+  ],
+  schedule: ["Daily quick scan", "毎日のクイックスキャン", "每日快速扫描"],
+  scheduleDesc: [
+    "Scan Downloads at the chosen hour while the app is open. Missed scans are not replayed.",
+    "アプリ起動中、指定時間にダウンロードを検査します。未実行分の追いかけ実行はしません。",
+    "应用打开时，在指定时间扫描下载文件夹。不补执行错过的扫描。",
+  ],
+  hour: ["Local start hour", "開始時刻（現地時間）", "开始时间（本地）"],
+  limits: ["Scan limits", "スキャン上限", "扫描限制"],
+  maxFile: [
+    "Maximum file size (MB)",
+    "最大ファイルサイズ（MB）",
+    "最大文件大小（MB）",
+  ],
+  limitsDesc: [
+    "Oversized files and archives are reported as incomplete checks. Symlinks are not followed.",
+    "上限を超えたファイル・アーカイブは検査未完了として扱います。シンボリックリンクは追跡しません。",
+    "超出限制的文件和压缩包视为检查不完整。不跟随符号链接。",
+  ],
+  save: ["Save settings", "設定を保存", "保存设置"],
+  saved: ["Settings saved", "設定を保存しました", "设置已保存"],
+  privacy: [
+    "Permissions & local data",
+    "権限とローカルデータ",
+    "权限与本地数据",
+  ],
+  privacyDesc: [
+    "Scans run as your user. macOS may restrict access to protected folders.",
+    "スキャンは一般ユーザー権限で実行します。macOSが保護フォルダへのアクセスを制限する場合があります。",
+    "扫描以当前用户权限运行。macOS 可能限制对受保护文件夹的访问。",
+  ],
+  fullDisk: [
+    "Open Full Disk Access",
+    "フルディスクアクセス設定",
+    "打开完全磁盘访问设置",
+  ],
+  dataDir: ["App data location", "アプリデータ保存先", "应用数据位置"],
+  onDemand: [
+    "ClamAV provides on-demand scanning here. XProtect and Gatekeeper remain important. Real-time interception is not enabled.",
+    "このアプリはClamAVの手動・予約検査を提供します。XProtect・Gatekeeperも引き続き重要です。リアルタイム遮断は行いません。",
+    "此应用提供 ClamAV 按需和定时扫描。XProtect 和 Gatekeeper 仍很重要。未启用实时拦截。",
+  ],
+  installerTitle: ["Install ClamAV", "ClamAVをインストール", "安装 ClamAV"],
+  installerDesc: [
+    "Download the official Universal PKG. The app verifies the pinned Cisco Talos PGP key, package signature, and Gatekeeper assessment before opening it.",
+    "公式Universal PKGを取得し、固定したCisco TalosのPGP鍵・PKG署名・Gatekeeperで検証してから開きます。",
+    "下载官方 Universal PKG，并在打开前使用固定的 Cisco Talos PGP 密钥、软件包签名和 Gatekeeper 进行验证。",
+  ],
+  installerSteps: [
+    "Download → Verify → macOS Installer → Definitions",
+    "取得 → 署名検証 → macOSで導入 → 定義更新",
+    "下载 → 验证 → macOS 安装 → 更新定义",
+  ],
+  installerAuth: [
+    "macOS Installer asks for administrator authentication. After installation, refresh engine status and download definitions.",
+    "管理者認証はmacOSインストーラーで行います。導入後に状態を再確認し、定義ファイルを取得してください。",
+    "macOS 安装程序会要求管理员验证。安装后，请刷新引擎状态并下载病毒定义。",
+  ],
+  existingEngine: [
+    "An existing engine was found. This installer can replace /usr/local/clamav. Review the native installer before continuing.",
+    "既存エンジンを検出しました。/usr/local/clamavが置き換わる場合があります。標準インストーラーの内容を確認してください。",
+    "发现已有引擎。安装程序可能替换 /usr/local/clamav。请检查原生安装程序的内容。",
+  ],
+  downloadVerify: ["Download & verify", "取得して検証", "下载并验证"],
+  openInstaller: [
+    "Open macOS Installer",
+    "macOSインストーラーを開く",
+    "打开 macOS 安装程序",
+  ],
+  verified: ["Package verified", "パッケージ検証済み", "软件包已验证"],
+  downloading: [
+    "Downloading official package",
+    "公式パッケージを取得中",
+    "正在下载官方软件包",
+  ],
+  verifying: ["Verifying signatures", "署名を検証中", "正在验证签名"],
+  updating: [
+    "Updating virus definitions",
+    "ウイルス定義を更新中",
+    "正在更新病毒定义",
+  ],
+  float: ["Float activity panel", "ログを別ウインドウにする", "浮动活动面板"],
+  dock: ["Dock activity panel", "ログをドッキング", "停靠活动面板"],
+  dockLeft: ["Dock on left", "左側にドッキング", "停靠到左侧"],
+  dockRight: ["Dock on right", "右側にドッキング", "停靠到右侧"],
+  panelFloating: [
+    "Activity is in a separate window",
+    "ログは別ウインドウに表示中",
+    "活动显示在独立窗口中",
+  ],
+  dismiss: ["Dismiss", "閉じる", "关闭"],
+  working: ["Working…", "処理中…", "正在处理…"],
+  selectHistory: ["View scan details", "スキャン詳細を表示", "查看扫描详情"],
+  fileChanged: [
+    "The file changed since the scan. Scan it again before quarantining.",
+    "スキャン後にファイルが変更されました。再スキャンしてから隔離してください。",
+    "文件在扫描后发生变化。请重新扫描后再隔离。",
+  ],
+  destinationExists: [
+    "A file already exists at the original path. Move it before restoring.",
+    "復元先にファイルがあります。既存ファイルを移動してから復元してください。",
+    "原路径已有文件。请先移动现有文件，再恢复。",
+  ],
+  busy: [
+    "Another engine operation is running. Wait for it to finish.",
+    "別のエンジン処理が実行中です。完了後に再試行してください。",
+    "另一项引擎操作正在运行。请等候完成后再试。",
+  ],
+  operationError: [
+    "The operation could not complete. Technical details are shown below.",
+    "処理を完了できませんでした。下に技術的な詳細を表示します。",
+    "操作未能完成。技术详情如下。",
+  ],
+  scan_started: ["Scan started", "スキャン開始", "扫描已开始"],
+  scan_finished: ["Scan finished", "スキャン終了", "扫描已结束"],
+  definitions_updated: [
+    "Definitions updated",
+    "定義ファイル更新完了",
+    "病毒定义已更新",
+  ],
+  installer_ready: [
+    "Installer verified",
+    "インストーラー検証完了",
+    "安装程序已验证",
+  ],
+  installer_opened: [
+    "macOS Installer opened",
+    "macOSインストーラー起動",
+    "macOS 安装程序已打开",
+  ],
+  file_quarantined: ["File quarantined", "ファイルを隔離", "文件已隔离"],
+  file_restored: ["File restored", "ファイルを復元", "文件已恢复"],
+  error: ["Operation failed", "処理エラー", "操作失败"],
+} as const;
+export type CopyKey = keyof typeof copy;
+export function translate(language: Language, key: CopyKey): string {
+  return copy[key][language === "en" ? 0 : language === "ja" ? 1 : 2];
+}
+export function isCopyKey(key: string): key is CopyKey {
+  return key in copy;
+}
+export function date(value: string | null, lang: Language): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(lang, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
