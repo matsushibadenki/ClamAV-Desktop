@@ -1,6 +1,108 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  moreInfo: ["More information", "詳細情報", "更多信息"],
+  waitingToRetry: ["Waiting to retry", "再試行を待機中", "等待重试"],
+  retryNotBefore: ["Retry not before", "再試行の待機期限", "最早重试时间"],
+  diagnosticsTitle: ["Diagnostics and retry", "診断と再試行", "诊断与重试"],
+  retryOperation: ["Retry", "再試行", "重试"],
+  noDiagnosticFailures: [
+    "No failed latest attempts are recorded.",
+    "直近の操作に失敗の記録はありません。",
+    "最近的操作没有失败记录。",
+  ],
+  exportDiagnostics: [
+    "Export diagnostics JSON",
+    "診断情報をJSON出力",
+    "导出诊断JSON",
+  ],
+  diagnosticsExportHelp: [
+    "Exports local status, settings, recent logs, scan/quarantine records and update diagnostics. Includes file paths and hashes, but no file contents or environment variables. Review before sharing.",
+    "状態・設定・最近のログ・検査/隔離記録・更新の診断情報を出力します。パスとハッシュを含みますが、ファイルの内容や環境変数は含みません。共有前に内容を確認してください。",
+    "导出本地状态、设置、最近日志、扫描/隔离记录及更新诊断。包含文件路径和哈希，不包含文件内容或环境变量。共享前请检查内容。",
+  ],
+  rateLimitWait: [
+    "Wait until the cooldown shown in the technical details expires. Avoid repeated updates; automatic checks remain spaced apart.",
+    "診断の詳細にある待機期間が終了するまでお待ちください。更新の連続実行は避けてください。自動確認も間隔を空けて実行します。",
+    "请等待技术详情中的冷却期限结束。避免连续更新；自动检查也保持间隔。",
+  ],
+  diagnosticKind_engine_inspection: [
+    "Engine inspection failed",
+    "エンジンの確認に失敗",
+    "引擎检查失败",
+  ],
+  diagnosticKind_engine_install: [
+    "Installer preparation failed",
+    "インストーラーの取得・検証に失敗",
+    "安装程序获取或验证失败",
+  ],
+  diagnosticKind_engine_launch: [
+    "Installer launch failed",
+    "インストーラーの起動に失敗",
+    "安装程序启动失败",
+  ],
+  diagnosticKind_definitions_update: [
+    "Definition update failed",
+    "定義更新に失敗",
+    "病毒库更新失败",
+  ],
+  diagnosticKind_unknown: ["Operation failed", "操作に失敗", "操作失败"],
+  diagnostic_rate_limit: [
+    "The update service requested a cooldown. Check the indicated retry time.",
+    "更新サービスから待機を求められています。再試行可能な時刻を確認してください。",
+    "更新服务要求冷却等待。请检查允许重试的时间。",
+  ],
+  diagnostic_engine_update_required: [
+    "The engine may be outdated or access was rejected. Check details and obtain the official installer if needed.",
+    "エンジンが古い、またはアクセスが拒否された可能性があります。詳細を確認し、必要なら公式インストーラーを取得してください。",
+    "引擎可能已过时或访问被拒绝。请检查详情，必要时获取官方安装程序。",
+  ],
+  diagnostic_cache_limit: [
+    "The download limit was reached. Clean eligible downloads or save a higher limit in Settings, then retry.",
+    "ダウンロード容量上限に達しています。設定で削除可能な保存先を整理するか上限を増やして保存し、再試行してください。",
+    "已达到下载容量上限。请在设置中清理可删除的下载或提高上限并保存，然后重试。",
+  ],
+  diagnostic_disk_full: [
+    "Not enough disk space. Free space on the app data volume before retrying.",
+    "空き容量が不足しています。アプリ保存先の容量を確保して再試行してください。",
+    "磁盘空间不足。请释放应用存储卷的空间后重试。",
+  ],
+  diagnostic_engine_missing: [
+    "The engine or FreshClam was not found. Install the official engine, then inspect again.",
+    "エンジンまたはFreshClamが見つかりません。公式エンジンを導入して再確認してください。",
+    "未找到引擎或FreshClam。请安装官方引擎后重新检查。",
+  ],
+  diagnostic_access_denied: [
+    "The app cannot write or execute a required path. Check ownership and volume access, then retry.",
+    "必要なパスへの書き込み・実行が拒否されています。所有者とボリュームのアクセス権を確認して再試行してください。",
+    "无法写入或执行所需路径。请检查所有者和卷访问权限后重试。",
+  ],
+  diagnostic_verification_failed: [
+    "Downloaded data failed a trust check. Keep verification enabled and retry from the official source; inspect details if it repeats.",
+    "取得データの信頼性を確認できません。検証を省略せず公式配布元から再取得し、繰り返す場合は詳細を確認してください。",
+    "下载数据未通过信任验证。请勿跳过验证。请从官方来源重新下载；若再次失败，请检查详情。",
+  ],
+  diagnostic_timeout: [
+    "The operation timed out. Check the network or engine response before retrying.",
+    "処理が時間制限を超えました。ネットワークやエンジンの応答を確認して再試行してください。",
+    "操作超时。请检查网络或引擎响应后重试。",
+  ],
+  diagnostic_network: [
+    "The service could not be reached. Check the connection, DNS or proxy and retry later.",
+    "サービスに接続できません。接続・DNS・プロキシを確認して後ほど再試行してください。",
+    "无法连接服务。请检查网络、DNS或代理后稍后重试。",
+  ],
+  diagnostic_definitions_invalid: [
+    "Usable app-owned definitions were not found after updating. Check details and retry; existing external definitions are preserved.",
+    "更新後にアプリ専用の有効な定義を確認できません。詳細を確認して再試行してください。外部の既存定義は保持します。",
+    "更新后未找到有效的应用专用病毒库。请检查详情并重试；保留已有外部病毒库。",
+  ],
+  diagnostic_unknown: [
+    "Check the technical details, resolve the reported condition and retry.",
+    "診断の詳細を確認し、表示された問題を解消して再試行してください。",
+    "请检查技术详情，解决报告的问题后重试。",
+  ],
+
   stopIntegrity: ["Stop check", "確認を停止", "停止检查"],
   exportProtectedPath: [
     "Choose a location outside app storage and original file paths.",

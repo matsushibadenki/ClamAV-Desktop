@@ -1,3 +1,6 @@
+import InfoHint from "../components/InfoHint";
+import useRetryBlock from "../useRetryBlock";
+import Diagnostics from "../components/Diagnostics";
 import DownloadCache from "../components/DownloadCache";
 import { useState } from "react";
 import { command, desktop } from "../bridge";
@@ -5,13 +8,14 @@ import { date } from "../i18n";
 import type { ViewProps } from "../components/shared";
 export default function Settings(props: ViewProps) {
   const { data, t, run, pending, setup } = props;
+  const retryBlocked = useRetryBlock(data.diagnostics);
   const [draft, setDraft] = useState(data.settings);
   const busy = pending || !!data.operation || data.scan?.status === "running";
   return (
     <>
       <header className="page-heading">
         <h1>{t("settingsTitle")}</h1>
-        <p>{t("settingsDesc")}</p>
+        <InfoHint text={t("settingsDesc")} label={t("moreInfo")} />
       </header>
       <section className="settings-section">
         <h2>{t("engineSection")}</h2>
@@ -36,7 +40,12 @@ export default function Settings(props: ViewProps) {
         <div className="button-row">
           <button
             className="primary"
-            disabled={busy || !desktop || !data.engine.version}
+            disabled={
+              busy ||
+              !desktop ||
+              !data.engine.version ||
+              retryBlocked("definitions_update")
+            }
             onClick={() => void run(() => command("update_definitions"))}
           >
             {t("update")}
@@ -46,6 +55,7 @@ export default function Settings(props: ViewProps) {
           </button>
         </div>
       </section>
+      <Diagnostics {...props} />
       <DownloadCache {...props} />
       <form
         onSubmit={(e) => {
@@ -60,11 +70,12 @@ export default function Settings(props: ViewProps) {
           <label className="setting-toggle">
             <span>
               <strong>{t("autoUpdate")}</strong>
-              <small>{t("autoUpdateDesc")}</small>
+              <InfoHint text={t("autoUpdateDesc")} label={t("moreInfo")} />
             </span>
             <input
               type="checkbox"
               role="switch"
+              aria-label={t("autoUpdate")}
               checked={draft.autoUpdate}
               onChange={(e) =>
                 setDraft({ ...draft, autoUpdate: e.target.checked })
@@ -74,11 +85,12 @@ export default function Settings(props: ViewProps) {
           <label className="setting-toggle">
             <span>
               <strong>{t("schedule")}</strong>
-              <small>{t("scheduleDesc")}</small>
+              <InfoHint text={t("scheduleDesc")} label={t("moreInfo")} />
             </span>
             <input
               type="checkbox"
               role="switch"
+              aria-label={t("schedule")}
               checked={draft.scheduleEnabled}
               onChange={(e) =>
                 setDraft({ ...draft, scheduleEnabled: e.target.checked })
@@ -133,7 +145,7 @@ export default function Settings(props: ViewProps) {
               }
             />
           </label>
-          <p>{t("cacheLimitHelp")}</p>
+          <InfoHint text={t("cacheLimitHelp")} label={t("moreInfo")} />
         </section>
         <section className="settings-section">
           <h2>{t("limits")}</h2>
@@ -150,7 +162,7 @@ export default function Settings(props: ViewProps) {
               }
             />
           </label>
-          <p>{t("limitsDesc")}</p>
+          <InfoHint text={t("limitsDesc")} label={t("moreInfo")} />
           <button type="submit" className="primary" disabled={pending}>
             {t("save")}
           </button>
@@ -158,7 +170,7 @@ export default function Settings(props: ViewProps) {
       </form>
       <section className="settings-section">
         <h2>{t("privacy")}</h2>
-        <p>{t("privacyDesc")}</p>
+        <InfoHint text={t("privacyDesc")} label={t("moreInfo")} />
         <button
           className="secondary"
           disabled={!desktop || pending}
@@ -168,7 +180,7 @@ export default function Settings(props: ViewProps) {
         </button>
         <h3>{t("dataDir")}</h3>
         <p className="path">{data.dataDir}</p>
-        <p className="helper">{t("onDemand")}</p>
+        <InfoHint text={t("onDemand")} label={t("moreInfo")} />
       </section>
     </>
   );

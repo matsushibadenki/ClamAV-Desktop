@@ -107,6 +107,7 @@ pub struct Snapshot {
     pub activity_dock: String,
     pub installer_ready: bool,
     pub data_dir: String,
+    pub diagnostics: Vec<crate::diagnostics::Attempt>,
 }
 
 #[cfg(test)]

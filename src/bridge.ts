@@ -30,6 +30,7 @@ let snapshot: Snapshot = {
   activityDock: "right",
   installerReady: false,
   dataDir: "—",
+  diagnostics: [],
 };
 const listeners = new Set<() => void>();
 let revision = 0;
@@ -62,6 +63,7 @@ type Command =
   | "verify_quarantine_integrity"
   | "stop_integrity_check"
   | "export_quarantine"
+  | "export_diagnostics"
   | "refresh_engine"
   | "prepare_installer"
   | "open_installer"

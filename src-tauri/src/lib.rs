@@ -1,4 +1,5 @@
 mod details;
+mod diagnostics;
 mod downloads;
 mod engine;
 mod file_transfer;
@@ -167,6 +168,27 @@ async fn export_quarantine(app: AppHandle, window: WebviewWindow) -> Result<Opti
     .map_err(err)?
 }
 #[tauri::command]
+async fn export_diagnostics(app: AppHandle, window: WebviewWindow) -> Result<Option<String>> {
+    main_window(&window)?;
+    let Some(file) = rfd::AsyncFileDialog::new()
+        .set_file_name("clamav-diagnostics.json")
+        .add_filter("JSON", &["json"])
+        .save_file()
+        .await
+    else {
+        return Ok(None);
+    };
+    let destination = file.path().to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        let c = core(&app);
+        let bytes = serde_json::to_vec_pretty(&diagnostics::report(&c)?).map_err(err)?;
+        details::write_export(&c, &destination, &bytes)?;
+        Ok(Some(destination.to_string_lossy().into()))
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
 fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
     main_window(&window)?;
     if !["ja", "en", "zh-CN"].contains(&settings.language.as_str())
@@ -304,6 +326,7 @@ pub fn run() {
             verify_quarantine_integrity,
             stop_integrity_check,
             export_quarantine,
+            export_diagnostics,
             refresh_engine,
             prepare_installer,
             open_installer,

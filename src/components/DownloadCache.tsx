@@ -1,3 +1,4 @@
+import InfoHint from "./InfoHint";
 import { useEffect, useState } from "react";
 import { command, desktop } from "../bridge";
 import type { CacheReport } from "../types";
@@ -43,7 +44,7 @@ export default function DownloadCache({ t, run, pending, data }: ViewProps) {
   return (
     <section className="settings-section">
       <h2>{t("downloadCache")}</h2>
-      <p>{t("cachePolicy")}</p>
+      <InfoHint text={t("cachePolicy")} label={t("moreInfo")} />
       <p className="helper">
         {t("retentionDays")}: {data.settings.downloadRetentionDays} ·{" "}
         {t("cacheLimitMb")}: {data.settings.downloadCacheMb}
@@ -96,7 +97,7 @@ export default function DownloadCache({ t, run, pending, data }: ViewProps) {
           close={() => setConfirm(false)}
           closeLabel={t("cancel")}
         >
-          <p>{t("cachePolicy")}</p>
+          <InfoHint text={t("cachePolicy")} label={t("moreInfo")} />
           <p>
             {t("reclaimable")}: {bytes(report?.reclaimableBytes ?? 0)} ·{" "}
             {report?.removable ?? 0}

@@ -1132,3 +1132,35 @@ nav button.active {
 .integrity-progress button {
   justify-self: start;
 }
+
+.modal .toast {
+  position: sticky;
+  inset: auto;
+  bottom: 0;
+  width: 100%;
+  margin-top: 16px;
+}
+.diagnostic-section {
+  margin-top: 16px;
+}
+
+.info-hint {
+  display: inline-flex;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.setting-toggle strong + .info-hint {
+  margin-left: 8px;
+}
+.diagnostic-section .button-row {
+  align-items: center;
+}
+.setting-toggle > span {
+  flex-direction: row;
+  align-items: center;
+}
+.setting-toggle .info-hint {
+  width: auto;
+  min-width: 0;
+  padding: 4px;
+}

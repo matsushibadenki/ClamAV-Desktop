@@ -1,25 +1,31 @@
+import InfoHint from "./InfoHint";
+import useRetryBlock from "../useRetryBlock";
 import { CheckCircle2, Download, ShieldCheck } from "lucide-react";
 import { command, desktop } from "../bridge";
 import type { ViewProps } from "./shared";
 import { isCopyKey } from "../i18n";
 import Modal from "./Modal";
+import Diagnostics from "./Diagnostics";
 export default function Installer({
   data,
   t,
   run,
   pending,
+  setup,
+  navigate,
   close,
 }: ViewProps & { close: () => void }) {
+  const retryBlocked = useRetryBlock(data.diagnostics);
   return (
     <Modal title={t("installerTitle")} close={close} closeLabel={t("dismiss")}>
-      <p>{t("installerDesc")}</p>
+      <InfoHint text={t("installerDesc")} label={t("moreInfo")} />
       <div className="installer-flow">
         <Download size={20} />
         <span>{t("installerSteps")}</span>
       </div>
       <p className="helper">ClamAV 1.5.4 · Universal PKG · arm64 / x86_64</p>
       {data.engine.path && <p className="notice">{t("existingEngine")}</p>}
-      <p>{t("installerAuth")}</p>
+      <InfoHint text={t("installerAuth")} label={t("moreInfo")} />
       {data.operation?.kind === "installer" && (
         <div className="installer-progress" role="status">
           <strong>
@@ -52,13 +58,28 @@ export default function Installer({
           {t("verified")}
         </p>
       )}
+      <Diagnostics
+        data={data}
+        t={t}
+        run={run}
+        pending={pending}
+        setup={setup}
+        navigate={navigate}
+        compact
+        kinds={["engine_install", "engine_launch"]}
+      />
       <div className="modal-actions">
         <button className="secondary" onClick={close}>
           {t("cancel")}
         </button>
         <button
           className="primary"
-          disabled={pending || !!data.operation || !desktop}
+          disabled={
+            pending ||
+            !!data.operation ||
+            !desktop ||
+            (!data.installerReady && retryBlocked("engine_install"))
+          }
           onClick={() =>
             void run(() =>
               command(

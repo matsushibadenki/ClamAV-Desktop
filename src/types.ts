@@ -65,6 +65,7 @@ export interface Snapshot {
   activityDock: string;
   installerReady: boolean;
   dataDir: string;
+  diagnostics: DiagnosticAttempt[];
 }
 
 export interface CacheReport {
@@ -101,4 +102,13 @@ export interface QuarantineDetail {
     staged: FileState;
     temporary: FileState;
   }[];
+}
+
+export interface DiagnosticAttempt {
+  retryNotBefore: string | null;
+  at: string;
+  kind: string;
+  status: string;
+  code: string;
+  detail: string | null;
 }

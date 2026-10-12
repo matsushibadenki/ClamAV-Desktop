@@ -72,21 +72,23 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key = detail.includes("export_protected_path")
-        ? "exportProtectedPath"
-        : detail.includes("download_cache_limit_exceeded")
-          ? "cacheLimitExceeded"
-          : detail.includes("transfer_insufficient_space")
-            ? "insufficientSpace"
-            : detail === "desktop_required"
-              ? "desktopRequired"
-              : detail.includes("file_changed")
-                ? "fileChanged"
-                : detail.includes("restore_destination_exists")
-                  ? "destinationExists"
-                  : detail === "busy"
-                    ? "busy"
-                    : "operationError";
+      const key = detail.includes("diagnostic_retry_wait")
+        ? "rateLimitWait"
+        : detail.includes("export_protected_path")
+          ? "exportProtectedPath"
+          : detail.includes("download_cache_limit_exceeded")
+            ? "cacheLimitExceeded"
+            : detail.includes("transfer_insufficient_space")
+              ? "insufficientSpace"
+              : detail === "desktop_required"
+                ? "desktopRequired"
+                : detail.includes("file_changed")
+                  ? "fileChanged"
+                  : detail.includes("restore_destination_exists")
+                    ? "destinationExists"
+                    : detail === "busy"
+                      ? "busy"
+                      : "operationError";
       setNotice({ key, detail, error: true });
       return false;
     } finally {

@@ -53,3 +53,16 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Native debug QA uses an isolated harmless 8GiB sparse file. The UI showed byte/percentage progress and stopped at 66.50MiB, then displayed a cancelled result with no measured hash. The source size remained unchanged.
 - Native save dialog exported to a dedicated /private/tmp JSON file. Parsing verified schemaVersion=1 and all 3 records, including a cancelled integrity result, an existing verified result, and a restored record excluded by the UI filter. Output permissions were 0600.
 - Verification stops between read operations; OS-blocked disk I/O can delay acknowledgement. The result-saving phase is not interruptible. Narrow-window and console QA remain unverified for this change.
+
+## Engine/update diagnostics and support bundle
+
+- Rust tests verify HTTP/rate-limit, trust, timeout, disk and network classification; latest-attempt persistence across Core restart; success clearing a failure; retry backoff; partial report generation when cache information is inaccessible. A FreshClam outcome test rejects cooldown output even with exit code zero.
+- Native debug UI used a dedicated fixture with a stored rate-limit deadline. The definition-update button was disabled and the retry deadline/guidance rendered. This was controlled fixture evidence, not a live CDN rejection.
+- Installer preparation was rejected by a real local 257MiB cache policy with a 2MiB fixture, before downloading. The modal and settings showed the reason and retry action; retry updated the persisted attempt.
+- Native save dialog exported a report to /private/tmp. Parsing confirmed app version, engine/settings, rate-limit deadline, cache failure, cache bytes and private 0600 permissions. User data and engine installations were not modified.
+- Official classification reference: [ClamAV FreshClam FAQ](https://docs.clamav.net/faq/faq-freshclam.html). The 24-hour fallback is this application's conservative backoff when no usable server/tool retry time is present.
+- Live HTTP 403/429/503/1020, disconnected-network failures, narrow-window layout and native console capture remain unverified.
+
+- Updated screen copy follows the information-icon rule: functional explanations in Settings, installer and cache controls use localized native hover help with accessible labels; failure reasons and retry deadlines remain visible. Modal error notifications now stay inside the dialog width.
+
+- Browser preview at http://127.0.0.1:1432/ confirmed localized information-icon help and explicit switch names; clicking a help icon did not toggle its setting. Error/warning console capture returned no entries. This preview does not exercise native updater commands.

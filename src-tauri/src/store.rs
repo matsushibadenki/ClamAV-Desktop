@@ -67,8 +67,10 @@ impl Core {
             }
             save_row(&db, "scans", &scan.id, scan)?;
         }
+        let diagnostics = crate::diagnostics::load(&db)?;
         Ok(Self {
             document: Mutex::new(Snapshot {
+                diagnostics,
                 engine: Engine::default(),
                 scan: None,
                 history,

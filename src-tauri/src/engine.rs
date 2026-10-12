@@ -21,6 +21,18 @@ pub fn freshclam(scan: &Path) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 pub async fn inspect(app: &AppHandle) -> Result<Engine> {
+    let result = inspect_inner(app).await;
+    if result.is_err() {
+        let c = core(app);
+        let mut d = c.document.lock().unwrap();
+        d.engine.checked = true;
+        d.engine.version = None;
+        d.engine.path = discover().map(|p| p.to_string_lossy().into());
+    }
+    crate::diagnostics::record(app, "engine_inspection", &result);
+    result
+}
+async fn inspect_inner(app: &AppHandle) -> Result<Engine> {
     let c = core(app);
     let path = discover();
     let mut version = None;
@@ -40,6 +52,11 @@ pub async fn inspect(app: &AppHandle) -> Result<Engine> {
         .await?;
         if result.code == Some(0) && output.starts_with("ClamAV ") {
             version = Some(output);
+        } else {
+            return Err(format!(
+                "engine_probe_failed: exit={:?}; {output}",
+                result.code
+            ));
         }
     }
     let mut definitions_at = None;
@@ -84,6 +101,9 @@ pub async fn inspect(app: &AppHandle) -> Result<Engine> {
 }
 pub async fn update(app: AppHandle) -> Result<()> {
     let c = core(&app);
+    if crate::diagnostics::retry_blocked(&c, "definitions_update") {
+        return Err("diagnostic_retry_wait".into());
+    }
     {
         let mut d = c.document.lock().unwrap();
         if d.operation.is_some() || d.scan.as_ref().is_some_and(|s| s.status == "running") {
@@ -101,6 +121,7 @@ pub async fn update(app: AppHandle) -> Result<()> {
         let mut d = c.document.lock().unwrap();
         d.operation = None;
     }
+    crate::diagnostics::record(&app, "definitions_update", &result);
     let _ = inspect(&app).await;
     match &result {
         Ok(_) => c.log(&app, "definitions_updated", ""),
@@ -130,7 +151,18 @@ async fn update_inner(app: &AppHandle) -> Result<()> {
         None,
         Duration::from_secs(1800),
         |s| {
-            tail = s.chars().take(2048).collect();
+            tail.push_str(s);
+            tail.push('\n');
+            if tail.len() > 8192 {
+                tail = tail
+                    .chars()
+                    .rev()
+                    .take(4096)
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect();
+            }
             if last.elapsed() > Duration::from_millis(300) {
                 last = std::time::Instant::now();
                 if let Some(op) = &mut c.document.lock().unwrap().operation {
@@ -141,13 +173,34 @@ async fn update_inner(app: &AppHandle) -> Result<()> {
         },
     )
     .await?;
-    if result.code != Some(0) {
-        return Err(format!("freshclam_failed: {tail}"));
-    }
+    validate_update(result.code, &tail)?;
     if inspect(app).await?.database_path.as_deref() != Some(db.to_string_lossy().as_ref()) {
         return Err("definitions_missing".into());
     }
     Ok(())
+}
+
+fn validate_update(code: Option<i32>, tail: &str) -> Result<()> {
+    if code != Some(0) || crate::diagnostics::classify(tail) == "rate_limit" {
+        return Err(format!("freshclam_failed: exit={code:?}; {tail}"));
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::*;
+    #[test]
+    fn cooldown_is_failure_even_when_freshclam_returns_zero() {
+        let tail = "WARNING: FreshClam previously received error code 429
+WARNING: You are on cool-down until after: 2099-01-01 12:00:00";
+        assert!(validate_update(Some(0), tail)
+            .unwrap_err()
+            .contains("cool-down"));
+        assert!(validate_update(Some(1), "network failed")
+            .unwrap_err()
+            .contains("network failed"));
+        assert!(validate_update(Some(0), "daily database is up-to-date").is_ok());
+    }
 }
 
 fn valid_header(path: &Path) -> bool {

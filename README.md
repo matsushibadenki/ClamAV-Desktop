@@ -84,3 +84,9 @@ Quarantine details can recheck SHA-256 and save the timestamp, comparison result
 Export all quarantine records and latest integrity results as JSON regardless of search filters. Integrity checks show byte/percentage progress and can be stopped. Stopped checks retain the file and never publish a partial digest.
 
 可将全部隔离记录及最近完整性结果导出为JSON，不应用搜索筛选。完整性检查显示容量与百分比进度，并支持停止。停止的检查保留文件，不输出未完成的哈希值。
+
+設定の「診断と再試行」でエンジン・定義更新の直近の失敗理由、診断詳細、再試行案内を確認できます。更新制限には待機期限を表示し、連続実行を抑制します。「診断情報をJSON出力」で状態・設定・ログ・隔離情報などをまとめて保存できます。パスを含むため、共有前に内容を確認してください。
+
+Settings provides persistent engine/update failure diagnostics and retry guidance. Rate limits show a retry deadline and suppress repeated attempts. Export a support JSON containing local state, settings, logs and quarantine information; review included paths before sharing.
+
+设置提供持久化的引擎/病毒库更新失败诊断与重试说明。限流时显示等待期限并抑制重复尝试。可导出包含本地状态、设置、日志及隔离信息的诊断JSON；共享前请检查其中的文件路径。

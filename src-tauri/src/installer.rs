@@ -150,6 +150,9 @@ async fn verify_apple(package: &Path) -> Result<()> {
 }
 pub async fn prepare(app: AppHandle) -> Result<()> {
     let c = core(&app);
+    if crate::diagnostics::retry_blocked(&c, "engine_install") {
+        return Err("diagnostic_retry_wait".into());
+    }
     {
         let mut d = c.document.lock().unwrap();
         if d.operation.is_some() || d.scan.as_ref().is_some_and(|s| s.status == "running") {
@@ -165,6 +168,7 @@ pub async fn prepare(app: AppHandle) -> Result<()> {
     c.publish(&app);
     let result = prepare_inner(&app).await;
     c.document.lock().unwrap().operation = None;
+    crate::diagnostics::record(&app, "engine_install", &result);
     match &result {
         Ok(_) => c.log(&app, "installer_ready", VERSION),
         Err(e) => c.log(&app, "error", e),
@@ -216,6 +220,20 @@ async fn prepare_inner(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 pub async fn open(app: &AppHandle) -> Result<()> {
+    let result = open_inner(app).await;
+    if result
+        .as_ref()
+        .err()
+        .is_some_and(|reason| crate::diagnostics::classify(reason) == "verification_failed")
+    {
+        let c = core(app);
+        *c.prepared.lock().unwrap() = None;
+        c.document.lock().unwrap().installer_ready = false;
+    }
+    crate::diagnostics::record(app, "engine_launch", &result);
+    result
+}
+async fn open_inner(app: &AppHandle) -> Result<()> {
     let c = core(app);
     let (pkg, hash) = c
         .prepared
