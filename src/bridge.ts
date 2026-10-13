@@ -39,15 +39,29 @@ function publish(next: Snapshot) {
   revision++;
   listeners.forEach((l) => l());
 }
-export async function connect() {
+export async function connect(onConnection?: (connected: boolean) => void) {
   if (!desktop) return () => {};
-  const unlisten = await listen<Snapshot>("core:state", (e) =>
-    publish(e.payload),
-  );
-  const before = revision;
-  const next = await invoke<Snapshot>("get_snapshot");
-  if (revision === before) publish(next);
-  return unlisten;
+  const subscriptions = await Promise.allSettled([
+    listen<Snapshot>("core:state", (e) => publish(e.payload)),
+    listen<boolean>("core:connection", (e) => onConnection?.(e.payload)),
+  ]);
+  const cleanup = () => {
+    subscriptions.forEach((result) => {
+      if (result.status === "fulfilled") result.value();
+    });
+  };
+  try {
+    for (const result of subscriptions) {
+      if (result.status === "rejected") throw result.reason;
+    }
+    const before = revision;
+    const next = await invoke<Snapshot>("get_snapshot");
+    if (revision === before) publish(next);
+    return cleanup;
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }
 function subscribe(listener: () => void) {
   listeners.add(listener);

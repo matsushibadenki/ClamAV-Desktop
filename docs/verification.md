@@ -1,5 +1,23 @@
 # Verification — 2026-10-11
 
+## Worker and local IPC — 2026-10-13
+
+- Final workspace suite: 46 Rust test entries passed; 6 fixture/environment tests skipped by default. The real-ClamAV IPC fixture was explicitly executed and passed with 2 scanned files / 1 harmless custom-signature detection. Retrying the same start request returned the original scan ID and left one history record.
+- Real worker subprocess tests cover client disconnection, continued ownership, graceful shutdown and socket removal, SIGKILL followed by stale-socket replacement, and refusal of relative roots/debug environment overrides. All fixtures use dedicated temporary data.
+- GUI backend tests verify startup attachment without a second Core, no local fallback when the owner is unreachable, renderer layout in the proxy, worker survival after proxy close, and reopening a local Core after worker shutdown.
+- Protocol tests cover injected UID mismatch, version/time/target validation, unknown commands, malformed/partial/oversized frames, a silent-peer timeout, bounded oversized-snapshot replies, private socket mode, unsafe socket preservation, one listener per Core, persistent replay responses, ambiguous claims and a full request ledger. The cross-user rejection branch is tested with injected UID values; an actual different-user connection is still pending.
+- Frontend: 6 tests passed, including connection callback forwarding and subscription cleanup when the initial state or either subscription fails. TypeScript/Vite build passed. The new messages exist in English/Japanese/Simplified Chinese.
+- Unix socket bind tests require execution outside the standard sandbox; inside it, macOS returned EPERM. No service registration or privileges were added to the product.
+- Updated release app/worker and standard development DMG were built; app codesign and image checksum verification passed and SHA-256 metadata was regenerated. The worker binary is a separate developer artifact and is not yet bundled inside the .app. No persistent background service was registered.
+- After the Mac was unlocked, native release GUI connected to the actual worker and displayed the existing engine/history. An unsupported engine-refresh action rendered its Japanese message. The activity panel floated and docked again. Stopping the worker rendered the connection-loss toast; restarting it removed the toast automatically. Japanese wording was shortened after screenshot inspection found an awkward sentence-ending wrap at 1180 × 800; the rebuilt app displayed the revised message on one line. The worker was stopped with SIGINT, the socket was removed, and the final GUI was reopened in local mode with successful engine refresh. Additional languages, narrow windows and native console capture remain unverified for this change.
+
+## Shared Rust core and process ownership — 2026-10-13
+
+- Workspace suite: 34 Rust tests passed (including the subprocess fixture entry); 5 environment-dependent tests skipped by default. The new headless scan fixture was then explicitly run and passed, bringing executed application-flow coverage to scan, quarantine, integrity verification, restore and restart using installed ClamAV and a harmless custom signature. Fixture files were removed; user files were not scanned.
+- The independent core crate built and ran the headless fixture without Tauri dependencies. Six ownership/notification test entries cover a real second-process rejection, unchanged live scan/journal data, SIGKILL lock release, recovery timestamps remaining unchanged on a second restart, initialization failure release, aliases, unsafe locks and a callback reading Core again.
+- Frontend: 3 tests passed; TypeScript/Vite production build passed. Native release app loaded existing state, recognized ClamAV 1.5.4 and rendered the main and floating activity windows. Floating and re-docking confirmed Rust-owned state notifications across both WebViews. Native console capture, narrow-window rendering and the startup-conflict dialog were not inspected for this change.
+- Release app built with ad-hoc signing. Standard DMG packaging failed under the sandbox with hdiutil's device-not-configured error. A plain UDZO image was created outside the sandbox from the same generated app; it does not contain the usual Finder layout or Applications shortcut. App codesign verification and DMG checksum verification passed, and SHA-256/release metadata were regenerated. No service registration, formal notarization or publication was performed.
+
 - `npm run build`: TypeScript and Vite production build passed.
 - `npm test`: 1 localization/date contract test passed.
 - `cargo test --manifest-path src-tauri/Cargo.toml --offline`: 8 tests passed, 2 fixture-dependent tests skipped by default.

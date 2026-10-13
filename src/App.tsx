@@ -48,7 +48,11 @@ export default function App() {
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    void connect()
+    void connect((connected) => {
+      if (disposed) return;
+      if (!connected) setNotice({ key: "workerDisconnected", error: true });
+      else setNotice((previous) => previous?.key === "workerDisconnected" ? null : previous);
+    })
       .then((fn) => {
         if (disposed) fn();
         else cleanup = fn;
@@ -72,7 +76,9 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key = detail.includes("diagnostic_retry_wait")
+      const key = detail.includes("worker_operation_unavailable")
+        ? "workerOperationUnavailable"
+        : detail.includes("diagnostic_retry_wait")
         ? "rateLimitWait"
         : detail.includes("export_protected_path")
           ? "exportProtectedPath"

@@ -1,6 +1,16 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  workerDisconnected: [
+    "Worker connection lost. Reconnecting; operations remain with the worker.",
+    "バックグラウンド処理との接続が切れました。再接続中です。",
+    "后台进程连接已断开，正在尝试重新连接。",
+  ],
+  workerOperationUnavailable: [
+    "This operation is not available while connected to the worker yet.",
+    "この操作は、バックグラウンド処理への接続中はまだ利用できません。",
+    "连接后台进程时，此操作暂不可用。",
+  ],
   moreInfo: ["More information", "詳細情報", "更多信息"],
   waitingToRetry: ["Waiting to retry", "再試行を待機中", "等待重试"],
   retryNotBefore: ["Retry not before", "再試行の待機期限", "最早重试时间"],

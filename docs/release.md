@@ -21,14 +21,14 @@ Rustとフロントエンドのテスト後、releaseモードの`.app`とDMGを
 
 ## 更新手順
 
-- package.json、src-tauri/Cargo.toml、src-tauri/tauri.conf.jsonのバージョンを揃え、npmのロックファイルとCargo.lockも更新します。事前確認で不一致を拒否します。
+- package.json、src-tauri/Cargo.toml、src-tauri/core/Cargo.toml、src-tauri/tauri.conf.jsonのバージョンを揃え、npmのロックファイルとCargo.lockも更新します。事前確認で不一致を拒否します。
 - 同梱するClamAVの公式バージョンを変更する場合は、installer.rsとInstaller.tsxの表示を更新し、公式鍵・PGP・Apple署名・Gatekeeper検証テストを再実行します。
 - 対象CPUごとのビルドを作成し、同じCPUのクリーンなMacでDMGから起動・エンジン導入・検出・隔離・復元・再起動を確認します。通常のローカルビルドは実行したMacのCPU用です。Intel・Universalは別途検証が必要です。
 - 配布するDMGに検証ファイルのSHA-256が一致することを確認します。スクリプトは公開やアップロードを行いません。アプリの自動アップデーターは未実装です。
 
 ## English
 
-`npm run dist:mac` produces an ad-hoc development app and DMG, runs tests, verifies their integrity, and writes checksums. It does not claim notarization. For distribution, configure a valid Developer ID Application identity and notarization credentials in the environment, run `npm run release:mac -- --check`, then deliberately run `npm run release:mac` when ready to submit the app to Apple. Keep all three version declarations synchronized. The script never publishes releases.
+`npm run dist:mac` produces an ad-hoc development app and DMG, runs workspace tests, verifies their integrity, and writes checksums. It does not claim notarization. For distribution, configure a valid Developer ID Application identity and notarization credentials in the environment, run `npm run release:mac -- --check`, then deliberately run `npm run release:mac` when ready to submit the app to Apple. Keep all four version declarations synchronized. The script never publishes releases.
 
 ## 简体中文
 

@@ -31,7 +31,7 @@ impl Default for Settings {
         }
     }
 }
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Engine {
     pub path: Option<String>,
@@ -76,14 +76,14 @@ pub struct QuarantineItem {
     pub mode: u32,
     pub status: String,
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Activity {
     pub at: String,
     pub code: String,
     pub detail: String,
 }
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     pub kind: String,
@@ -93,7 +93,7 @@ pub struct Operation {
     pub total: Option<u64>,
     pub message: Option<String>,
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub engine: Engine,

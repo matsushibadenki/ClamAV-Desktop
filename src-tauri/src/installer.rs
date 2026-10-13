@@ -1,3 +1,4 @@
+use crate::bridge::core;
 use crate::{model::*, process, scanner, store::*};
 use futures_util::StreamExt;
 use pgp::composed::{Deserializable, DetachedSignature, SignedPublicKey};
@@ -59,7 +60,7 @@ async fn download(
         .open(path)
         .await
         .map_err(err)?;
-    let c = core(app);
+    let c = core(app)?;
     let mut size = 0;
     let mut last = Instant::now();
     while let Some(chunk) = stream.next().await {
@@ -75,7 +76,7 @@ async fn download(
                 op.downloaded = size;
                 op.total = total;
             }
-            c.publish(app);
+            c.publish();
         }
     }
     file.sync_all().await.map_err(err)?;
@@ -149,7 +150,7 @@ async fn verify_apple(package: &Path) -> Result<()> {
     Ok(())
 }
 pub async fn prepare(app: AppHandle) -> Result<()> {
-    let c = core(&app);
+    let c = core(&app)?;
     if crate::diagnostics::retry_blocked(&c, "engine_install") {
         return Err("diagnostic_retry_wait".into());
     }
@@ -165,13 +166,13 @@ pub async fn prepare(app: AppHandle) -> Result<()> {
         });
         d.installer_ready = false;
     }
-    c.publish(&app);
+    c.publish();
     let result = prepare_inner(&app).await;
     c.document.lock().unwrap().operation = None;
-    crate::diagnostics::record(&app, "engine_install", &result);
+    crate::diagnostics::record(&c, "engine_install", &result);
     match &result {
-        Ok(_) => c.log(&app, "installer_ready", VERSION),
-        Err(e) => c.log(&app, "error", e),
+        Ok(_) => c.log("installer_ready", VERSION),
+        Err(e) => c.log("error", e),
     }
     result
 }
@@ -179,7 +180,7 @@ async fn prepare_inner(app: &AppHandle) -> Result<()> {
     if !cfg!(target_os = "macos") {
         return Err("macos_only".into());
     }
-    let c = core(app);
+    let c = core(app)?;
     crate::downloads::ensure_download_budget(&c)?;
     let dir = c
         .root
@@ -208,7 +209,7 @@ async fn prepare_inner(app: &AppHandle) -> Result<()> {
     if let Some(op) = &mut c.document.lock().unwrap().operation {
         op.stage = "verifying".into();
     }
-    c.publish(app);
+    c.publish();
     let p = pkg.clone();
     tauri::async_runtime::spawn_blocking(move || verify_pgp(&p, &sig))
         .await
@@ -226,15 +227,15 @@ pub async fn open(app: &AppHandle) -> Result<()> {
         .err()
         .is_some_and(|reason| crate::diagnostics::classify(reason) == "verification_failed")
     {
-        let c = core(app);
+        let c = core(app)?;
         *c.prepared.lock().unwrap() = None;
         c.document.lock().unwrap().installer_ready = false;
     }
-    crate::diagnostics::record(app, "engine_launch", &result);
+    crate::diagnostics::record(core(app)?.as_ref(), "engine_launch", &result);
     result
 }
 async fn open_inner(app: &AppHandle) -> Result<()> {
-    let c = core(app);
+    let c = core(app)?;
     let (pkg, hash) = c
         .prepared
         .lock()
@@ -260,7 +261,7 @@ async fn open_inner(app: &AppHandle) -> Result<()> {
     if result.code != Some(0) {
         return Err("installer_open_failed".into());
     }
-    c.log(app, "installer_opened", VERSION);
+    c.log("installer_opened", VERSION);
     Ok(())
 }
 #[cfg(test)]

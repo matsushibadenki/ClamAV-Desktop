@@ -739,18 +739,29 @@ name = "clamav-desktop"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "clamav-desktop-core",
  "futures-util",
- "hex",
- "libc",
  "pgp",
  "reqwest 0.12.28",
  "rfd",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "clamav-desktop-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "libc",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
- "tauri",
- "tauri-build",
  "tokio",
  "uuid",
 ]

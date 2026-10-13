@@ -1,6 +1,5 @@
 use crate::{model::*, scanner, store::*};
 use std::{fs, path::Path};
-use tauri::AppHandle;
 #[cfg(target_os = "macos")]
 pub(crate) fn move_exclusive(from: &Path, to: &Path) -> Result<()> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
@@ -36,8 +35,7 @@ pub(crate) fn safe_path(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
-    let c = core(app);
+pub fn quarantine(c: &Core, id: &str) -> Result<()> {
     let _gate = c.file_gate.lock().unwrap();
     let finding = c
         .snapshot()
@@ -94,7 +92,7 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
             Err(e) => {
                 item.status = "move_failed".into();
                 save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-                refresh_items(app)?;
+                refresh_items(c)?;
                 return Err(e);
             }
         }
@@ -142,7 +140,7 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
             d.quarantine.retain(|q| q.id != id);
             d.quarantine.insert(0, item);
         }
-        c.publish(app);
+        c.publish();
         return Err(reason);
     }
     item.status = "active".into();
@@ -150,7 +148,7 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
     if let Some(j) = transfer {
         let finished = crate::file_transfer::finish(&c.db.lock().unwrap(), &j);
         if let Err(e) = finished {
-            refresh_items(app)?;
+            refresh_items(c)?;
             return Err(e);
         }
     }
@@ -174,11 +172,10 @@ pub fn quarantine(app: &AppHandle, id: &str) -> Result<()> {
             }
         }
     }
-    c.log(app, "file_quarantined", source.to_string_lossy());
+    c.log("file_quarantined", source.to_string_lossy());
     Ok(())
 }
-pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
-    let c = core(app);
+pub fn restore(c: &Core, id: &str) -> Result<()> {
     let _gate = c.file_gate.lock().unwrap();
     let mut item = c
         .snapshot()
@@ -215,7 +212,7 @@ pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
             Err(e) => {
                 item.status = original_status;
                 save_row(&c.db.lock().unwrap(), "quarantine", id, &item)?;
-                refresh_items(app)?;
+                refresh_items(c)?;
                 return Err(e);
             }
         }
@@ -237,7 +234,7 @@ pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
     if let Some(j) = transfer {
         let finished = crate::file_transfer::finish(&c.db.lock().unwrap(), &j);
         if let Err(e) = finished {
-            refresh_items(app)?;
+            refresh_items(c)?;
             return Err(e);
         }
     }
@@ -247,8 +244,8 @@ pub fn restore(app: &AppHandle, id: &str) -> Result<()> {
             *q = item.clone();
         }
     }
-    refresh_items(app)?;
-    c.log(app, "file_restored", dest.to_string_lossy());
+    refresh_items(c)?;
+    c.log("file_restored", dest.to_string_lossy());
     Ok(())
 }
 fn confirm_detection(snapshot: &Snapshot, path: &Path, signature: &str) -> Result<()> {
@@ -342,8 +339,7 @@ pub fn reconcile(
     Ok(())
 }
 
-pub fn refresh_items(app: &AppHandle) -> Result<()> {
-    let c = core(app);
+pub fn refresh_items(c: &Core) -> Result<()> {
     let db = c.db.lock().unwrap();
     let pending = crate::file_transfer::recover(&db)?;
     let mut items: Vec<QuarantineItem> = crate::store::read_rows(&db, "quarantine")?;
@@ -376,7 +372,7 @@ pub fn refresh_items(app: &AppHandle) -> Result<()> {
         }
         d.quarantine = items;
     }
-    c.publish(app);
+    c.publish();
     Ok(())
 }
 

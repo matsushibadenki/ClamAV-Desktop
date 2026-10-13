@@ -205,12 +205,11 @@ fn check_with(
     }
     result
 }
-pub fn verify(app: &tauri::AppHandle, id: &str) -> Result<()> {
+pub fn verify(c: &Core, id: &str) -> Result<()> {
     use std::{
         sync::atomic::Ordering,
         time::{Duration, Instant},
     };
-    let c = core(app);
     let _gate = c.file_gate.try_lock().map_err(|_| "busy")?;
     let item = c
         .snapshot()
@@ -231,7 +230,7 @@ pub fn verify(app: &tauri::AppHandle, id: &str) -> Result<()> {
             ..Default::default()
         });
     }
-    c.publish(app);
+    c.publish();
     let mut last = Instant::now();
     let mut result = check_with(
         &c.root.join("quarantine").join(&item.id),
@@ -243,7 +242,7 @@ pub fn verify(app: &tauri::AppHandle, id: &str) -> Result<()> {
                     op.downloaded = read;
                     op.total = Some(total);
                 }
-                c.publish(app);
+                c.publish();
                 last = Instant::now();
             }
         },
@@ -273,7 +272,7 @@ pub fn verify(app: &tauri::AppHandle, id: &str) -> Result<()> {
         Ok(())
     })();
     c.document.lock().unwrap().operation = None;
-    c.log(app, "integrity_checked", format!("{id}: {}", result.state));
+    c.log("integrity_checked", format!("{id}: {}", result.state));
     saved
 }
 #[derive(Serialize)]

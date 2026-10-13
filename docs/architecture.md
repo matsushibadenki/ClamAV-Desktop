@@ -1,6 +1,12 @@
 # Architecture
 
-アプリ終了中の予約実行と任意のclamd対応は[背景サービスの実装計画](background-service-plan.md)を参照。現行CoreはGUIプロセス内にあり、ファイル操作Mutexはプロセス間排他ではない。別プロセスを導入する前に共有コアの通知分離と所有権ロックを実装する。サービスはまだ登録・実装していない。
+アプリ終了中の予約実行と任意のclamd対応は[背景サービスの実装計画](background-service-plan.md)を参照。共有処理はTauri非依存の`src-tauri/core` crateへ分離済み。通常はGUIプロセス内でCoreを所有する。[手動worker](worker.md)を先に起動した場合、GUIは起動時にIPCプロキシへ接続する。OSサービス登録とアプリ終了中の予約実行は未実装。
+
+workerは2スレッドのTokioで動作し、公開TCPポートを使わない。private socketの両側でOSのpeer UIDを確認する。GUIプロキシは最終受信状態の表示キャッシュだけを持ち、DB・取消フラグ・操作を所有しない。毎秒状態を取得し、切断時は3言語で通知して再接続を試みる。worker接続中はGUIのmaintenanceを起動しない。起動中のモード切り替えは未実装で、接続が失敗してもCoreを追加生成しない。未移行のコマンドはworker_operation_unavailableで拒否する。
+
+Coreは`StateNotifier`を所有し、Snapshotを渡す。通知時はDocumentのMutexを解放しているため、通知先はCoreを再読取できる。GUIの`bridge.rs`だけがAppHandleとcore:stateイベントを扱う。検査タスクはArc<Core>を保持してTokio上で動き、ウインドウから独立している。Installerの画面起動とRendererはGUI側に残す。
+
+Core生成時は通常ファイルの`owner.lock`をO_NOFOLLOW/O_CLOEXECで開き、所有UID、私有モード、ハードリンク数、パスとinodeの一致を確認してflockの非ブロッキング排他を取得する。SQLite初期化・中断検査の変更・転送復旧・保存用サブディレクトリの変更は取得後だけ行う。他プロセスの使用中はdata_in_useで拒否し、GUIは3言語の終了案内を表示する。ロックはCoreの存続中保持し、DBを閉じてからファイル記述子の解放で解除する。ロックファイルは削除しない。強制終了時もOSが解放する。既存のfile_gateは同一Core内の操作排他として残す。ロックに対応しない旧バージョンと同時起動しないことが必要。
 
 `Core`がRustのDocument（Snapshot）、SQLite、取消フラグ、ファイル操作ロック、検証済みインストーラを所有します。React側はイベントを購読し、コマンドを送信します。各ウインドウにある状態はページやダイアログといった表示状態だけです。スキャン、設定、履歴、隔離、パネル配置はRustが所有します。
 

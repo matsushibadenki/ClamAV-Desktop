@@ -164,10 +164,9 @@ pub fn save(c: &Core, kind: &str, reason: Option<&str>) -> Result<()> {
     d.diagnostics.sort_by(|a, b| b.at.cmp(&a.at));
     persisted.map(|_| ())
 }
-pub fn record<T>(app: &tauri::AppHandle, kind: &str, result: &Result<T>) {
-    let c = core(app);
+pub fn record<T>(c: &Core, kind: &str, result: &Result<T>) {
     let _ = save(&c, kind, result.as_ref().err().map(String::as_str));
-    c.publish(app);
+    c.publish();
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

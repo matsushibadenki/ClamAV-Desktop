@@ -20,9 +20,13 @@ const rustVersion = readFileSync(
   join(root, "src-tauri/Cargo.toml"),
   "utf8",
 ).match(/^version = "([^"]+)"/m)?.[1];
-if (version !== packageVersion || version !== rustVersion) {
+const coreVersion = readFileSync(
+  join(root, "src-tauri/core/Cargo.toml"),
+  "utf8",
+).match(/^version = "([^"]+)"/m)?.[1];
+if (version !== packageVersion || version !== rustVersion || version !== coreVersion) {
   console.error(
-    "Synchronize package.json, Cargo.toml, and tauri.conf.json versions before building.",
+    "Synchronize package.json, both Cargo.toml files, and tauri.conf.json versions before building.",
   );
   process.exit(1);
 }
@@ -107,7 +111,7 @@ if (check) {
 run("npm", ["test"], environment);
 run(
   "cargo",
-  ["test", "--manifest-path", "src-tauri/Cargo.toml", "--locked"],
+  ["test", "--manifest-path", "src-tauri/Cargo.toml", "--locked", "--workspace"],
   environment,
 );
 const config = signed

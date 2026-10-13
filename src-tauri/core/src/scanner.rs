@@ -5,10 +5,9 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
-    sync::atomic::Ordering,
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
-use tauri::AppHandle;
 pub fn digest(path: &Path) -> Result<String> {
     let mut f = File::open(path).map_err(err)?;
     let mut h = Sha256::new();
@@ -43,8 +42,7 @@ pub fn parse(line: &str) -> Parsed<'_> {
     }
     Parsed::Other
 }
-pub async fn start(app: AppHandle, kind: String, target: Option<String>) -> Result<String> {
-    let c = core(&app);
+pub async fn start(c: Arc<Core>, kind: String, target: Option<String>) -> Result<String> {
     let binary = engine::discover().ok_or("engine_missing")?;
     let home = std::env::var("HOME").map_err(err)?;
     let target = match kind.as_str() {
@@ -93,9 +91,8 @@ pub async fn start(app: AppHandle, kind: String, target: Option<String>) -> Resu
         d.scan = Some(scan.clone());
         c.cancel.store(false, Ordering::Relaxed);
     }
-    c.log(&app, "scan_started", scan.target.clone());
-    tauri::async_runtime::spawn(async move {
-        let c = core(&app);
+    c.log("scan_started", scan.target.clone());
+    tokio::spawn(async move {
         let mut scan = scan;
         let mut last = Instant::now();
         let mut file_errors = HashSet::new();
@@ -170,7 +167,7 @@ pub async fn start(app: AppHandle, kind: String, target: Option<String>) -> Resu
                 if last.elapsed() > Duration::from_millis(200) {
                     last = Instant::now();
                     c.document.lock().unwrap().scan = Some(scan.clone());
-                    c.publish(&app);
+                    c.publish();
                 }
             },
         )
@@ -207,7 +204,7 @@ pub async fn start(app: AppHandle, kind: String, target: Option<String>) -> Resu
             d.history.insert(0, scan.clone());
             d.scan = Some(scan);
         }
-        c.log(&app, "scan_finished", "");
+        c.log("scan_finished", "");
     });
     Ok(id)
 }

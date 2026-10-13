@@ -3,15 +3,21 @@ use rusqlite::{params, Connection};
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
 };
-use tauri::{AppHandle, Emitter, Manager};
 pub type Result<T> = std::result::Result<T, String>;
 pub fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 pub fn now() -> String {
     chrono::Utc::now().to_rfc3339()
+}
+pub trait StateNotifier: Send + Sync {
+    fn publish(&self, snapshot: Snapshot);
+}
+struct SilentNotifier;
+impl StateNotifier for SilentNotifier {
+    fn publish(&self, _snapshot: Snapshot) {}
 }
 pub struct Core {
     pub document: Mutex<Snapshot>,
@@ -21,16 +27,24 @@ pub struct Core {
     pub integrity_cancel: AtomicBool,
     pub file_gate: Mutex<()>,
     pub prepared: Mutex<Option<(PathBuf, String)>>,
+    pub(crate) ipc_active: AtomicBool,
+    notifier: Arc<dyn StateNotifier>,
+    // Last field: the DB and document are dropped before process ownership is released.
+    _ownership: crate::ownership::Ownership,
 }
 impl Core {
     pub fn new(root: PathBuf) -> Result<Self> {
+        Self::with_notifier(root, Arc::new(SilentNotifier))
+    }
+    pub fn with_notifier(root: PathBuf, notifier: Arc<dyn StateNotifier>) -> Result<Self> {
         fs::create_dir_all(&root).map_err(err)?;
         let root = fs::canonicalize(root).map_err(err)?;
+        let ownership = crate::ownership::Ownership::acquire(&root)?;
+        private_dir(&root)?;
         for name in ["config", "database", "quarantine", "downloads"] {
             fs::create_dir_all(root.join(name)).map_err(err)?;
             private_dir(&root.join(name))?;
         }
-        private_dir(&root)?;
         let db = Connection::open(root.join("state.sqlite")).map_err(err)?;
         db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS file_transfers (id TEXT PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS runtime_kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS scans (id TEXT PRIMARY KEY, json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS quarantine (id TEXT PRIMARY KEY, json TEXT NOT NULL);").map_err(err)?;
         let settings = db
@@ -89,15 +103,18 @@ impl Core {
             integrity_cancel: AtomicBool::new(false),
             file_gate: Mutex::new(()),
             prepared: Mutex::new(None),
+            ipc_active: AtomicBool::new(false),
+            notifier,
+            _ownership: ownership,
         })
     }
     pub fn snapshot(&self) -> Snapshot {
         self.document.lock().unwrap().clone()
     }
-    pub fn publish(&self, app: &AppHandle) {
-        let _ = app.emit("core:state", self.snapshot());
+    pub fn publish(&self) {
+        self.notifier.publish(self.snapshot());
     }
-    pub fn log(&self, app: &AppHandle, code: &str, detail: impl Into<String>) {
+    pub fn log(&self, code: &str, detail: impl Into<String>) {
         {
             let mut d = self.document.lock().unwrap();
             d.activity.insert(
@@ -110,7 +127,7 @@ impl Core {
             );
             d.activity.truncate(100);
         }
-        self.publish(app);
+        self.publish();
     }
     pub fn save_scan(&self, scan: &Scan) -> Result<()> {
         save_row(&self.db.lock().unwrap(), "scans", &scan.id, scan)
@@ -147,9 +164,6 @@ pub fn private_dir(path: &Path) -> Result<()> {
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(err)?;
     }
     Ok(())
-}
-pub fn core(app: &AppHandle) -> tauri::State<'_, Core> {
-    app.state::<Core>()
 }
 #[cfg(test)]
 mod tests {

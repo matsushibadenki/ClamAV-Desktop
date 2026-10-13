@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tauri::AppHandle;
 pub fn discover() -> Option<PathBuf> {
     [
         "/usr/local/clamav/bin/clamscan",
@@ -20,20 +19,18 @@ pub fn freshclam(scan: &Path) -> Option<PathBuf> {
         .into_iter()
         .find(|p| p.is_file())
 }
-pub async fn inspect(app: &AppHandle) -> Result<Engine> {
-    let result = inspect_inner(app).await;
+pub async fn inspect(c: &Core) -> Result<Engine> {
+    let result = inspect_inner(c).await;
     if result.is_err() {
-        let c = core(app);
         let mut d = c.document.lock().unwrap();
         d.engine.checked = true;
         d.engine.version = None;
         d.engine.path = discover().map(|p| p.to_string_lossy().into());
     }
-    crate::diagnostics::record(app, "engine_inspection", &result);
+    crate::diagnostics::record(c, "engine_inspection", &result);
     result
 }
-async fn inspect_inner(app: &AppHandle) -> Result<Engine> {
-    let c = core(app);
+async fn inspect_inner(c: &Core) -> Result<Engine> {
     let path = discover();
     let mut version = None;
     if let Some(p) = &path {
@@ -96,11 +93,10 @@ async fn inspect_inner(app: &AppHandle) -> Result<Engine> {
         checked: true,
     };
     c.document.lock().unwrap().engine = engine.clone();
-    c.publish(app);
+    c.publish();
     Ok(engine)
 }
-pub async fn update(app: AppHandle) -> Result<()> {
-    let c = core(&app);
+pub async fn update(c: &Core) -> Result<()> {
     if crate::diagnostics::retry_blocked(&c, "definitions_update") {
         return Err("diagnostic_retry_wait".into());
     }
@@ -115,22 +111,21 @@ pub async fn update(app: AppHandle) -> Result<()> {
             ..Default::default()
         });
     }
-    c.publish(&app);
-    let result = update_inner(&app).await;
+    c.publish();
+    let result = update_inner(c).await;
     {
         let mut d = c.document.lock().unwrap();
         d.operation = None;
     }
-    crate::diagnostics::record(&app, "definitions_update", &result);
-    let _ = inspect(&app).await;
+    crate::diagnostics::record(c, "definitions_update", &result);
+    let _ = inspect(c).await;
     match &result {
-        Ok(_) => c.log(&app, "definitions_updated", ""),
-        Err(e) => c.log(&app, "error", e),
+        Ok(_) => c.log("definitions_updated", ""),
+        Err(e) => c.log("error", e),
     }
     result
 }
-async fn update_inner(app: &AppHandle) -> Result<()> {
-    let c = core(app);
+async fn update_inner(c: &Core) -> Result<()> {
     let scan = discover().ok_or("engine_missing")?;
     let binary = freshclam(&scan).ok_or("freshclam_missing")?;
     let db = c.root.join("database");
@@ -168,13 +163,13 @@ async fn update_inner(app: &AppHandle) -> Result<()> {
                 if let Some(op) = &mut c.document.lock().unwrap().operation {
                     op.message = Some(tail.clone())
                 }
-                c.publish(app);
+                c.publish();
             }
         },
     )
     .await?;
     validate_update(result.code, &tail)?;
-    if inspect(app).await?.database_path.as_deref() != Some(db.to_string_lossy().as_ref()) {
+    if inspect(c).await?.database_path.as_deref() != Some(db.to_string_lossy().as_ref()) {
         return Err("definitions_missing".into());
     }
     Ok(())

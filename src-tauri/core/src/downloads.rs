@@ -119,8 +119,7 @@ pub fn ensure_download_budget(c: &Core) -> Result<()> {
     }
     crate::file_transfer::require_capacity(&c.root.join("downloads"), maximum_attempt)
 }
-pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
-    let c = core(app);
+pub fn cleanup(c: &Core) -> Result<CacheReport> {
     let _gate = c.file_gate.lock().unwrap();
     {
         let mut d = c.document.lock().unwrap();
@@ -133,7 +132,7 @@ pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
             ..Default::default()
         });
     }
-    c.publish(app);
+    c.publish();
     let result = {
         let prepared = c.prepared.lock().unwrap();
         manage(
@@ -146,7 +145,6 @@ pub fn cleanup(app: &tauri::AppHandle) -> Result<CacheReport> {
     };
     c.document.lock().unwrap().operation = None;
     c.log(
-        app,
         if result.is_ok() {
             "cache_cleaned"
         } else {
