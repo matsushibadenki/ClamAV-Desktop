@@ -1164,3 +1164,6 @@ nav button.active {
   min-width: 0;
   padding: 4px;
 }
+
+.app-update-section progress { width: 100%; accent-color: var(--color-accent); }
+.app-update-section pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12rem; overflow: auto; }

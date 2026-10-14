@@ -84,3 +84,13 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Updated screen copy follows the information-icon rule: functional explanations in Settings, installer and cache controls use localized native hover help with accessible labels; failure reasons and retry deadlines remain visible. Modal error notifications now stay inside the dialog width.
 
 - Browser preview at http://127.0.0.1:1432/ confirmed localized information-icon help and explicit switch names; clicking a help icon did not toggle its setting. Error/warning console capture returned no entries. This preview does not exercise native updater commands.
+
+## Software updater and signed release — 2026-10-14
+
+- Frontend: 6 tests passed. Release manifest helpers: 2 tests passed. Workspace Rust tests passed outside the filesystem sandbox; Unix-socket tests cannot run within that sandbox. Environment-dependent tests remain ignored.
+- An additional signed-archive test verified the configured public key, signed version 0.2.0, and rejection after changing archive bytes.
+- The final Apple Silicon 0.2.0 app and DMG passed Developer ID verification and stapled notarization-ticket validation. Verified checksums and updater manifests were collected into the ignored release-output directory.
+- Native Settings at 1180 × 800 rendered the software updater with current version 0.2.0, help, checking state, and a localized failure/retry message for the GitHub feed before any public release exists. This does not prove a full install/restart cycle.
+- GitHub repository Secrets and environments were empty when checked. Hosted CI, a published newer-version upgrade, Intel, macOS 12, narrow-window screenshots, and native console capture remain pending. No source push or GitHub Release was performed.
+
+- 2026-10-14 follow-up: all six required repository Secret names are present. Secret values and the uploaded p12 identity have not been inspected; Hosted CI validation is still outstanding.

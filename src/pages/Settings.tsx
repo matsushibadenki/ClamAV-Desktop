@@ -1,3 +1,4 @@
+import AppUpdater from "../components/AppUpdater";
 import InfoHint from "../components/InfoHint";
 import useRetryBlock from "../useRetryBlock";
 import Diagnostics from "../components/Diagnostics";
@@ -55,6 +56,7 @@ export default function Settings(props: ViewProps) {
           </button>
         </div>
       </section>
+      <AppUpdater {...props} />
       <Diagnostics {...props} />
       <DownloadCache {...props} />
       <form

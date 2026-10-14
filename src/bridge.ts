@@ -71,6 +71,10 @@ export function useCore() {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 type Command =
+  | "get_app_update"
+  | "check_app_update"
+  | "install_app_update"
+  | "restart_app_update"
   | "get_download_cache"
   | "cleanup_download_cache"
   | "get_quarantine_detail"

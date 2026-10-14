@@ -37,6 +37,13 @@ pub(crate) fn safe_path(path: &Path) -> Result<()> {
 }
 pub fn quarantine(c: &Core, id: &str) -> Result<()> {
     let _gate = c.file_gate.lock().unwrap();
+    if c.snapshot()
+        .operation
+        .as_ref()
+        .is_some_and(|op| op.kind == "app_update")
+    {
+        return Err("busy".into());
+    }
     let finding = c
         .snapshot()
         .history
@@ -177,6 +184,13 @@ pub fn quarantine(c: &Core, id: &str) -> Result<()> {
 }
 pub fn restore(c: &Core, id: &str) -> Result<()> {
     let _gate = c.file_gate.lock().unwrap();
+    if c.snapshot()
+        .operation
+        .as_ref()
+        .is_some_and(|op| op.kind == "app_update")
+    {
+        return Err("busy".into());
+    }
     let mut item = c
         .snapshot()
         .quarantine

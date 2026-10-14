@@ -1,3 +1,4 @@
+mod app_updater;
 use clamav_desktop_core::{
     details, diagnostics, downloads, engine, model, process, quarantine, scanner, store,
 };
@@ -14,7 +15,35 @@ fn main_window(window: &WebviewWindow) -> Result<()> {
     if window.label() != "main" {
         return Err("main_window_required".into());
     }
+    if window
+        .app_handle()
+        .state::<app_updater::Service>()
+        .blocks_operations()
+    {
+        return Err("busy".into());
+    }
     Ok(())
+}
+#[tauri::command]
+fn get_app_update(app: AppHandle) -> app_updater::Status {
+    app.state::<app_updater::Service>().snapshot()
+}
+#[tauri::command]
+async fn check_app_update(app: AppHandle, window: WebviewWindow) -> Result<app_updater::Status> {
+    main_window(&window)?;
+    app_updater::check(app).await
+}
+#[tauri::command]
+async fn install_app_update(app: AppHandle, window: WebviewWindow) -> Result<app_updater::Status> {
+    main_window(&window)?;
+    app_updater::install(app).await
+}
+#[tauri::command]
+fn restart_app_update(app: AppHandle, window: WebviewWindow) -> Result<()> {
+    if window.label() != "main" {
+        return Err("main_window_required".into());
+    }
+    app_updater::restart(&app)
 }
 #[tauri::command]
 async fn get_snapshot(app: AppHandle) -> Result<Snapshot> {
@@ -191,7 +220,15 @@ async fn export_diagnostics(app: AppHandle, window: WebviewWindow) -> Result<Opt
     };
     let destination = file.path().to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
-        let bytes = serde_json::to_vec_pretty(&diagnostics::report(&c)?).map_err(err)?;
+        let mut report = serde_json::to_value(diagnostics::report(&c)?).map_err(err)?;
+        if let Some(fields) = report.as_object_mut() {
+            fields.insert(
+                "appUpdate".into(),
+                serde_json::to_value(app.state::<app_updater::Service>().snapshot())
+                    .map_err(err)?,
+            );
+        }
+        let bytes = serde_json::to_vec_pretty(&report).map_err(err)?;
         details::write_export(&c, &destination, &bytes)?;
         Ok(Some(destination.to_string_lossy().into()))
     })
@@ -313,7 +350,9 @@ async fn maintenance(app: AppHandle) {
 }
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            app.manage(app_updater::Service::new(app.package_info().version.to_string()));
             let root = app.path().app_data_dir()?;
             #[cfg(debug_assertions)]
             let root = std::env::var_os("CLAMAV_DESKTOP_DEV_DATA_DIR")
@@ -340,6 +379,11 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if window.try_state::<app_updater::Service>().is_some_and(|s| matches!(s.snapshot().phase.as_str(), "downloading" | "installing")) { api.prevent_close(); }
+                }
+            }
             if window.label() == "activity" && matches!(event, tauri::WindowEvent::Destroyed) {
                 let b = backend(window.app_handle());
                 let _ = b.set_panel(false, None);
@@ -347,6 +391,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            get_app_update, check_app_update, install_app_update, restart_app_update,
             get_snapshot,
             get_download_cache,
             cleanup_download_cache,
@@ -370,6 +415,11 @@ pub fn run() {
             export_history,
             open_privacy_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("unable to launch ClamAV Desktop");
+        .build(tauri::generate_context!())
+        .expect("unable to launch ClamAV Desktop")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if app.try_state::<app_updater::Service>().is_some_and(|s| matches!(s.snapshot().phase.as_str(), "downloading" | "installing")) { api.prevent_exit(); }
+            }
+        });
 }
