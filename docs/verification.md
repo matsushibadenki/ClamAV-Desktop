@@ -94,3 +94,7 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - GitHub repository Secrets and environments were empty when checked. Hosted CI, a published newer-version upgrade, Intel, macOS 12, narrow-window screenshots, and native console capture remain pending. No source push or GitHub Release was performed.
 
 - 2026-10-14 follow-up: all six required repository Secret names are present. Secret values and the uploaded p12 identity have not been inspected; Hosted CI validation is still outstanding.
+
+- Hosted CI started from commit `27b9be4` on 2026-10-14: checkout, frontend dependency installation, updater-key presence check, temporary signing-keychain import, and Apple notarization-profile setup passed. Run: https://github.com/matsushibadenki/ClamAV-Desktop/actions/runs/38504789164 . The build/notarization and Draft Release jobs subsequently completed successfully.
+
+- Downloaded CI artifacts matched SHA-256; the updater signature, signed version and tamper rejection passed locally. The DMG notarization ticket validated. GitHub normalized spaces in the uploaded DMG name; the Draft asset name and public metadata were synchronized to the stable hyphenated name without changing binary contents. Draft remains unpublished.

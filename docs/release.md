@@ -30,7 +30,7 @@ node scripts/merge-updater.mjs release-output
 
 ## GitHub Actionsの準備
 
-`.github/workflows/release.yml`はmainブランチからの手動実行のみ。固定コミットのアクションを使い、署名済み成果物を作ってDraft Releaseに追加する。公開操作は含まない。ソースとワークフローをGitHubへ反映してから実行する。2026-10-14の再確認では、リポジトリSecret `CLAMAV_DESKTOP_KEY`の登録を確認。`APPLE_ID`・`APPLE_TEAM_ID`・`APPLE_PASSWORD`もリポジトリSecretsへ登録済み。`TAURI_SIGNING_PRIVATE_KEY`は検証済みローカル鍵との一致を確認して登録済み。`APPLE_CERTIFICATE`・`APPLE_CERTIFICATE_PASSWORD`の登録名も確認済みで、必要な6つのSecretは揃っている。Secretの値・p12の有効性はHosted CIで検証する。Environmentは未作成、Hosted CIは未実行。`CLAMAV_DESKTOP_KEY`は更新署名鍵とは別の認証情報との確認を受けており、用途が確定するまでワークフローでは参照しない。更新署名には別途登録済みの`TAURI_SIGNING_PRIVATE_KEY`を使用する。
+`.github/workflows/release.yml`はmainブランチからの手動実行のみ。固定コミットのアクションを使い、署名済み成果物を作ってDraft Releaseに追加する。公開操作は含まない。ソースとワークフローをGitHubへ反映してから実行する。2026-10-14の再確認では、リポジトリSecret `CLAMAV_DESKTOP_KEY`の登録を確認。`APPLE_ID`・`APPLE_TEAM_ID`・`APPLE_PASSWORD`もリポジトリSecretsへ登録済み。`TAURI_SIGNING_PRIVATE_KEY`は検証済みローカル鍵との一致を確認して登録済み。`APPLE_CERTIFICATE`・`APPLE_CERTIFICATE_PASSWORD`の登録名も確認済みで、必要な6つのSecretは揃っている。Secretの値・p12の有効性はHosted CIで検証する。Hosted CIは2026-10-14に成功し、v0.2.0のDraft Releaseを作成済み。`CLAMAV_DESKTOP_KEY`は更新署名鍵とは別の認証情報との確認を受けており、用途が確定するまでワークフローでは参照しない。更新署名には別途登録済みの`TAURI_SIGNING_PRIVATE_KEY`を使用する。
 
 以下のSecretはリポジトリまたはGitHubの`release` Environmentに登録する。Environmentの対象ブランチをmainに制限し、レビュー後の実行にする。
 
@@ -63,3 +63,9 @@ package.json、package-lock.json、src-tauri/Cargo.toml、src-tauri/core/Cargo.t
 English: Software updates use signed GitHub archives with mandatory signed-version verification. The local notarization profile is `clamav-desktop`. GitHub Hosted CI needs its own release Secrets; it creates drafts only. Back up the ignored updater private key. End-to-end upgrades from a published newer version and Intel/macOS 12 validation are pending.
 
 简体中文：软件更新使用 GitHub 的签名归档，并强制验证签名中的版本。本地公证配置名为 `clamav-desktop`。GitHub 托管 CI 需要单独设置发行 Secrets，流程只创建草稿。请备份已排除在 Git 外的更新私钥。发布新版本后的完整更新流程，以及 Intel/macOS 12 实机验证仍待完成。
+
+## GitHub CIの確認結果（2026-10-14）
+
+[実行38504789164](https://github.com/matsushibadenki/ClamAV-Desktop/actions/runs/38504789164)はbuild・draftとも成功。GitHub生成のDMGと更新アーカイブをダウンロードし、SHA-256、公開鍵による署名・署名内バージョン照合、改変拒否、公証チケットを再確認した。Draftは未公開。GitHubによる空白のファイル名変換を避けるため、DMG名を`ClamAV-Desktop_0.2.0_aarch64.dmg`へ統一し、Draftのチェックサム記録も同期した。アプリ本体の内容は変更していない。
+
+初回公開前に、チャットへ提示された更新署名鍵を交換し、公開鍵・GitHub Secret・配布成果物を揃えて再生成することを推奨する。

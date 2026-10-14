@@ -51,7 +51,7 @@ run('npm',['run','tauri','--','build','--bundles',signed?'app':'app,dmg','--conf
 const bundle = join(root,'src-tauri/target/release/bundle');
 const app = join(bundle,'macos/ClamAV Desktop.app');
 const arch = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
-const dmgName = `ClamAV Desktop_${version}_${arch === 'aarch64'?'aarch64':'x64'}.dmg`;
+const dmgName = `ClamAV-Desktop_${version}_${arch === 'aarch64'?'aarch64':'x64'}.dmg`;
 const dmg = join(bundle,'dmg',dmgName);
 const output = join(bundle,'verification'); mkdirSync(output,{recursive:true});
 function notarize(file) {
