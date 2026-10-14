@@ -1,5 +1,7 @@
 # ClamAV Desktop
 
+<img src="docs/images/clamav-desktopimage.png">
+
 macOS用のClamAVフロントエンド。Tauri 2とRustで処理・状態を管理し、ReactのWebViewで操作します。表示言語は日本語、English、简体中文です。
 
 ## 起動
