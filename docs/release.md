@@ -66,6 +66,8 @@ English: Software updates use signed GitHub archives with mandatory signed-versi
 
 ## GitHub CIの確認結果（2026-10-14）
 
-[実行38504789164](https://github.com/matsushibadenki/ClamAV-Desktop/actions/runs/38504789164)はbuild・draftとも成功。GitHub生成のDMGと更新アーカイブをダウンロードし、SHA-256、公開鍵による署名・署名内バージョン照合、改変拒否、公証チケットを再確認した。Draftは未公開。GitHubによる空白のファイル名変換を避けるため、DMG名を`ClamAV-Desktop_0.2.0_aarch64.dmg`へ統一し、Draftのチェックサム記録も同期した。アプリ本体の内容は変更していない。
+[実行38504789164](https://github.com/matsushibadenki/ClamAV-Desktop/actions/runs/38504789164)はbuild・draftとも成功。GitHub生成のDMGと更新アーカイブをダウンロードし、SHA-256、公開鍵による署名・署名内バージョン照合、改変拒否、公証チケットを再確認した。v0.2.0はユーザーのデプロイ指示により公開済み。GitHubによる空白のファイル名変換を避けるため、DMG名を`ClamAV-Desktop_0.2.0_aarch64.dmg`へ統一し、Draftのチェックサム記録も同期した。アプリ本体の内容は変更していない。
 
-初回公開前に、チャットへ提示された更新署名鍵を交換し、公開鍵・GitHub Secret・配布成果物を揃えて再生成することを推奨する。
+更新署名鍵はチャットへ提示されたため、鍵移行を推奨する。v0.2.0は現行公開鍵で公開済みのため、単純な鍵差し替えでは既存クライアントの更新が失敗する。互換性を保つ移行計画または再インストール案内を用意する。
+
+[公開v0.2.0](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.2.0)の`latest.json`、DMG、更新アーカイブを認証なしで取得し、署名情報・SHA-256が検証済み成果物と一致することを確認した。より新しい版への実インストールと再起動は未検証。
