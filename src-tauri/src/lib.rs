@@ -236,28 +236,11 @@ async fn export_diagnostics(app: AppHandle, window: WebviewWindow) -> Result<Opt
     .map_err(err)?
 }
 #[tauri::command]
-fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
+async fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
     main_window(&window)?;
-    if !["ja", "en", "zh-CN"].contains(&settings.language.as_str())
-        || settings.schedule_hour > 23
-        || !(1..=4096).contains(&settings.max_file_mb)
-        || !(1..=365).contains(&settings.download_retention_days)
-        || !(257..=16384).contains(&settings.download_cache_mb)
-    {
-        return Err("invalid_settings".into());
-    }
-    let c = core(&app)?;
-    c.db.lock()
-        .unwrap()
-        .execute(
-            "INSERT OR REPLACE INTO settings(id,json) VALUES (1,?1)",
-            [serde_json::to_string(&settings).map_err(err)?],
-        )
-        .map_err(err)?;
-    c.document.lock().unwrap().settings = settings;
-    c.publish();
-    Ok(())
+    backend(&app).save_settings(settings).await
 }
+
 #[tauri::command]
 fn set_activity_panel(app: AppHandle, floating: bool, side: Option<String>) -> Result<()> {
     renderer::Renderer::activity_panel(&app, floating, side)

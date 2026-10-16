@@ -38,3 +38,5 @@ FreshClamのuntil after形式の時刻はローカル時刻として読み取り
 診断JSONは形式バージョン・出力日時・アプリバージョン・OS/CPUと、共有状態、隔離詳細、キャッシュ情報、取得エラーを含みます。ファイルの内容や環境変数を収集しません。パス・ハッシュ・ログを含むため、出力画面で共有前の確認を案内します。保存先の保護と0600の一時ファイルによる配置は隔離JSONと共通です。
 
 アプリ更新はGUIプロセスのRust Serviceが所有する。チェック・取得・インストール・再起動の状態と、検証済み更新候補をRustに保持し、WebViewへはメタデータと進捗だけを通知する。Tauri公式プラグイン2.13.3に固定し、requireSignedVersionを有効にする。GitHubの当該リポジトリのHTTPSアーカイブ以外は拒否する。取得中の容量確認と取得後の128MiB確認を行い、署名・バージョン検証に成功したデータだけをinstallへ渡す。Coreのファイル操作ロックと共有Operationを使って検査・転送と競合しないようにし、成功時は再起動待ちを保持する。worker接続時のインストールは拒否する。診断JSONにはappUpdate状態を追加する。
+
+Settings writes are centralized in core/settings.rs. A Core-owned settings mutex orders SQLite commits and Document updates across concurrent clients; failed commits do not update Document. Both Tauri and worker IPC use this path. The additive save_settings command participates in the existing persistent request ledger, preserving at-most-once replay behavior.

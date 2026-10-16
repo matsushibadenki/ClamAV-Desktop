@@ -256,3 +256,67 @@ async fn oversized_snapshot_returns_a_bounded_error_reply() {
     core.document.lock().unwrap().engine.version = None;
     shutdown(&client, server).await;
 }
+
+#[tokio::test]
+async fn settings_save_is_validated_persistent_and_retry_does_not_overwrite_newer_values() {
+    use clamav_desktop_core::model::Settings;
+    let fixture = Fixture::new();
+    let core = Arc::new(Core::new(fixture.0.clone()).unwrap());
+    let server = start(core.clone()).await;
+    let client = Client::new(fixture.0.clone()).unwrap();
+    let first = Request::new(Command::SaveSettings {
+        settings: Settings {
+            language: "en".into(),
+            download_retention_days: 1,
+            download_cache_mb: 257,
+            ..Settings::default()
+        },
+    });
+    assert!(matches!(
+        client.send(&first).await.unwrap().into_result().unwrap(),
+        Payload::Ack
+    ));
+    let next = Settings {
+        language: "zh-CN".into(),
+        schedule_hour: 23,
+        max_file_mb: 4096,
+        download_retention_days: 365,
+        download_cache_mb: 16384,
+        ..Settings::default()
+    };
+    client
+        .request(Command::SaveSettings {
+            settings: next.clone(),
+        })
+        .await
+        .unwrap();
+    // A delayed retry of an older save must return its stored acknowledgement only.
+    client.send(&first).await.unwrap().into_result().unwrap();
+    assert_eq!(core.snapshot().settings.language, "zh-CN");
+    let bad = Settings {
+        language: "unsupported".into(),
+        ..next.clone()
+    };
+    assert_eq!(
+        client
+            .request(Command::SaveSettings { settings: bad })
+            .await
+            .err()
+            .unwrap(),
+        "invalid_settings"
+    );
+    match client.request(Command::GetSnapshot).await.unwrap() {
+        Payload::Snapshot(state) => assert_eq!(
+            serde_json::to_value(state.settings).unwrap(),
+            serde_json::to_value(&next).unwrap()
+        ),
+        _ => panic!("snapshot expected"),
+    }
+    shutdown(&client, server).await;
+    drop(core);
+    let reopened = Core::new(fixture.0.clone()).unwrap();
+    assert_eq!(
+        serde_json::to_value(reopened.snapshot().settings).unwrap(),
+        serde_json::to_value(next).unwrap()
+    );
+}

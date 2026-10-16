@@ -11,4 +11,5 @@ mod ownership;
 pub mod process;
 pub mod quarantine;
 pub mod scanner;
+pub mod settings;
 pub mod store;

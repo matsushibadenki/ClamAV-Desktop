@@ -100,3 +100,12 @@ Temporary test files and fixture downloads were removed. App-generated history a
 - Downloaded CI artifacts matched SHA-256; the updater signature, signed version and tamper rejection passed locally. The DMG notarization ticket validated. GitHub normalized spaces in the uploaded DMG name; the Draft asset name and public metadata were synchronized to the stable hyphenated name without changing binary contents. Draft remains unpublished.
 
 - Deployment: v0.2.0 was published on explicit user request. Unauthenticated latest-release feed retrieval succeeded; the feed version, archive URL and signature matched the verified release. Public DMG and archive SHA-256 matched release.json. Full installation of a newer version and restart remain unverified.
+
+## Worker settings persistence — 2026-10-16
+
+- Rust workspace: 50 tests passed, 7 environment/fixture-dependent tests ignored. Frontend: 6 tests passed; TypeScript and Vite production build passed.
+- Real Unix-socket tests save settings through IPC, reject unsupported language, return the worker-owned snapshot, and retain settings after Core restart. A retry of an earlier save after a later save returns the stored acknowledgement without overwriting the newer settings.
+- GUI Backend proxy tests exercise settings writes through worker attachment, confirm that GUI never acquires SQLite ownership, and verify local-mode saves after worker shutdown/reopen.
+- Core tests reject invalid language, hour, file-size, retention and cache-limit values. A read-only SQLite failure leaves Document and reopened settings unchanged. Save ordering is serialized by a Core-owned settings gate.
+- Socket tests require execution outside the filesystem sandbox (inside it the OS rejects Unix listener creation). User data, release artifacts and GitHub Secrets were not changed.
+- Settings controls are unchanged; their existing information-icon help now explains in English/Japanese/Simplified Chinese that manual worker mode stores scheduling choices but does not execute schedules. Native GUI screenshots and hover text layout were not inspected for this change. Full worker scheduling, other operation migration, live ownership transfer and a newer-version updater install remain unfinished.

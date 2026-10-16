@@ -1,7 +1,7 @@
 //! Tauri adapter and worker proxy. Windows never own business state or SQLite.
 use clamav_desktop_core::{
     ipc::{Client, Command, Payload},
-    model::Snapshot,
+    model::{Settings, Snapshot},
     store::{Core, Result, StateNotifier},
 };
 use std::{
@@ -24,6 +24,17 @@ pub enum Backend {
     },
 }
 impl Backend {
+    pub async fn save_settings(&self, settings: Settings) -> Result<()> {
+        match self {
+            Self::Local(core) => clamav_desktop_core::settings::save(core, settings),
+            Self::Worker { client, .. } => {
+                match client.request(Command::SaveSettings { settings }).await? {
+                    Payload::Ack => Ok(()),
+                    _ => Err("ipc_invalid_response".into()),
+                }
+            }
+        }
+    }
     /// No fallback Core is created if the existing owner's IPC cannot be authenticated.
     pub async fn open(root: PathBuf, notifier: Arc<dyn StateNotifier>) -> Result<Self> {
         match Core::with_notifier(root.clone(), notifier) {
@@ -134,6 +145,15 @@ mod tests {
         let task = tokio::spawn(server.run(std::future::pending()));
         let proxy = Backend::open(root.clone(), Arc::new(Silent)).await.unwrap();
         assert!(matches!(&proxy, Backend::Worker { .. }));
+        proxy
+            .save_settings(Settings {
+                language: "en".into(),
+                ..Settings::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(owner.snapshot().settings.language, "en");
+        assert_eq!(proxy.snapshot().await.unwrap().settings.language, "en");
         proxy.set_panel(true, Some("left".into())).unwrap();
         assert!(proxy.snapshot().await.unwrap().activity_floating);
         assert!(!owner.snapshot().activity_floating);
@@ -149,6 +169,15 @@ mod tests {
         drop(owner);
         let local = Backend::open(root.clone(), Arc::new(Silent)).await.unwrap();
         assert!(matches!(&local, Backend::Local(_)));
+        assert_eq!(local.snapshot().await.unwrap().settings.language, "en");
+        local
+            .save_settings(Settings {
+                language: "ja".into(),
+                ..Settings::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(local.snapshot().await.unwrap().settings.language, "ja");
         drop(local);
         std::fs::remove_dir_all(root).unwrap();
     }

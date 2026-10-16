@@ -1,6 +1,6 @@
 //! Versioned, same-user IPC. One bounded request per connection; no file contents.
 use crate::{
-    model::Snapshot,
+    model::{Settings, Snapshot},
     scanner,
     store::{err, now, Core, Result},
 };
@@ -43,6 +43,9 @@ pub enum Command {
         target: Option<String>,
     },
     StopScan,
+    SaveSettings {
+        settings: Settings,
+    },
     Shutdown,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -380,6 +383,9 @@ impl ServiceState {
             .map_err(err)?;
         }
         let result = match &request.body {
+            Command::SaveSettings { settings } => {
+                crate::settings::save(&self.core, settings.clone()).map(|()| Payload::Ack)
+            }
             Command::StartScan { kind, target } => {
                 scanner::start(self.core.clone(), kind.clone(), target.clone())
                     .await
