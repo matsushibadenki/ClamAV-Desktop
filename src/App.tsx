@@ -76,7 +76,11 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key = detail.includes("worker_operation_unavailable")
+      const key = detail.includes("worker_prepared_installer")
+        ? "workerPreparedInstaller"
+        : /^worker_(start|stop)_/.test(detail)
+        ? "workerSwitchFailed"
+        : detail.includes("worker_operation_unavailable")
         ? "workerOperationUnavailable"
         : detail.includes("diagnostic_retry_wait")
         ? "rateLimitWait"

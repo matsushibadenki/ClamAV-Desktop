@@ -32,7 +32,9 @@ pub fn classify(reason: &str) -> &'static str {
         .iter()
         .any(|pattern| lower.contains(pattern))
     };
-    if status("429")
+    if lower.contains("definitions_update_cancelled") {
+        "cancelled"
+    } else if status("429")
         || lower.contains("cool-down")
         || lower.contains("cooldown")
         || lower.contains("retry after")
@@ -182,8 +184,14 @@ pub struct Report {
     pub collection_errors: Vec<String>,
 }
 pub fn report(c: &Core) -> Result<Report> {
+    report_with(c, crate::details::export(c))
+}
+pub(crate) fn report_unlocked(c: &Core) -> Result<Report> {
+    report_with(c, crate::details::export_unlocked(c))
+}
+fn report_with(c: &Core, quarantine: Result<crate::details::Export>) -> Result<Report> {
     let mut collection_errors = vec![];
-    let quarantine_details = match crate::details::export(c) {
+    let quarantine_details = match quarantine {
         Ok(value) => Some(value),
         Err(reason) if reason == "busy" => return Err(reason),
         Err(reason) => {

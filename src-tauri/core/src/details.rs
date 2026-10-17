@@ -1,7 +1,7 @@
 use crate::{file_transfer, model::QuarantineItem, quarantine::safe_path, store::*};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileState {
     pub path: String,
@@ -22,7 +22,7 @@ fn state(path: &Path) -> FileState {
         bytes,
     }
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferDetail {
     pub kind: String,
@@ -34,7 +34,7 @@ pub struct TransferDetail {
     pub last_error: Option<String>,
     pub attempted_at: Option<String>,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Detail {
     pub item: QuarantineItem,
@@ -44,7 +44,7 @@ pub struct Detail {
     pub integrity: Option<Integrity>,
 }
 pub fn get(c: &Core, id: &str) -> Result<Detail> {
-    let _gate = c.file_gate.lock().unwrap();
+    let _gate = c.file_gate.try_lock().map_err(|_| "busy")?;
     get_unlocked(c, id)
 }
 fn get_unlocked(c: &Core, id: &str) -> Result<Detail> {
@@ -101,7 +101,7 @@ fn detail_for_item(c: &Core, item: QuarantineItem) -> Result<Detail> {
     })
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Integrity {
     pub checked_at: String,
@@ -205,7 +205,27 @@ fn check_with(
     }
     result
 }
+pub fn stop(c: &Core) {
+    use std::sync::atomic::Ordering;
+    {
+        let mut document = c.document.lock().unwrap();
+        if let Some(op) = document
+            .operation
+            .as_mut()
+            .filter(|op| op.kind == "integrity" && op.stage != "finishingIntegrity")
+        {
+            c.integrity_cancel.store(true, Ordering::Relaxed);
+            op.stage = "stoppingIntegrity".into();
+        }
+    }
+    c.publish();
+}
+
 pub fn verify(c: &Core, id: &str) -> Result<()> {
+    verify_started(c, id, || {})
+}
+
+pub(crate) fn verify_started(c: &Core, id: &str, started: impl FnOnce()) -> Result<()> {
     use std::{
         sync::atomic::Ordering,
         time::{Duration, Instant},
@@ -231,6 +251,7 @@ pub fn verify(c: &Core, id: &str) -> Result<()> {
         });
     }
     c.publish();
+    started();
     let mut last = Instant::now();
     let mut result = check_with(
         &c.root.join("quarantine").join(&item.id),
@@ -275,7 +296,7 @@ pub fn verify(c: &Core, id: &str) -> Result<()> {
     c.log("integrity_checked", format!("{id}: {}", result.state));
     saved
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Export {
     pub schema_version: u32,
@@ -284,6 +305,9 @@ pub struct Export {
 }
 pub fn export(c: &Core) -> Result<Export> {
     let _gate = c.file_gate.try_lock().map_err(|_| "busy")?;
+    export_unlocked(c)
+}
+pub(crate) fn export_unlocked(c: &Core) -> Result<Export> {
     let items = c.snapshot().quarantine;
     Ok(Export {
         schema_version: 1,
@@ -296,12 +320,22 @@ pub fn export(c: &Core) -> Result<Export> {
 }
 pub fn write_export(c: &Core, destination: &Path, bytes: &[u8]) -> Result<()> {
     let _gate = c.file_gate.try_lock().map_err(|_| "busy")?;
+    write_export_unlocked(c, destination, bytes)
+}
+pub(crate) fn write_export_unlocked(c: &Core, destination: &Path, bytes: &[u8]) -> Result<()> {
     use std::{io::Write, os::unix::fs::OpenOptionsExt};
     let parent = fs::canonicalize(destination.parent().ok_or("invalid_path")?).map_err(err)?;
     safe_path(&parent)?;
     let destination = parent.join(destination.file_name().ok_or("invalid_path")?);
+    let snapshot = c.snapshot();
     if destination.starts_with(&c.root)
-        || c.snapshot()
+        || snapshot
+            .history
+            .iter()
+            .chain(snapshot.scan.iter())
+            .flat_map(|scan| &scan.findings)
+            .any(|finding| fs::canonicalize(&finding.path).is_ok_and(|path| path == destination))
+        || snapshot
             .quarantine
             .iter()
             .any(|q| fs::canonicalize(&q.original_path).is_ok_and(|p| p == destination))

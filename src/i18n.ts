@@ -1,6 +1,15 @@
 import type { Language } from "./types";
 // Each row is English, Japanese, Simplified Chinese. Missing copy is a type error.
 const copy = {
+  workerTitle: ["Execution", "実行プロセス", "执行进程"],
+  workerMode: ["Worker", "workerで実行", "后台进程运行"],
+  localMode: ["In this app", "GUI内で実行", "应用内运行"],
+  workerSwitching: ["Switching…", "切り替え中…", "正在切换…"],
+  useWorker: ["Use worker", "workerへ引き継ぐ", "切换至后台进程"],
+  useLocal: ["Return to app", "GUIへ戻す", "返回应用"],
+  workerHelp: ["Switch when idle. The worker continues accepted jobs after the GUI closes. Scheduling, automatic definition updates and login startup are not available in worker mode yet. Return to the app to install the engine or update the app. Unsaved settings are not transferred.", "処理が終わると切り替えられます。workerはGUI終了後も受け付けた処理を続けます。workerでの予約検査・自動定義更新・ログイン時の起動は未対応です。エンジン導入やアプリ更新時はGUIへ戻してください。未保存の設定は引き継ぎません。", "空闲时可切换。关闭界面后，后台进程仍会完成已接受的任务。目前不支持后台定时扫描、自动更新病毒库或登录时启动。安装引擎或更新应用前请返回应用模式。未保存的设置不会转移。"],
+  workerSwitchFailed: ["Could not switch. Check the execution mode and retry.", "切り替えられませんでした。実行プロセスを確認し、再試行してください。", "无法切换。请检查执行进程并重试。"],
+  workerPreparedInstaller: ["An installer is ready. Complete installation and restart the app before switching.", "準備済みのインストーラーがあります。インストールを完了し、アプリを再起動してから切り替えてください。", "安装包已准备好。请完成安装并重启应用后再切换。"],
   appUpdateTitle: ["Software update", "ソフトウェアアップデート", "软件更新"],
   appUpdateError_size: ["The update exceeds the 128 MiB download limit.", "更新ファイルが128 MiBの取得上限を超えています。", "更新文件超过 128 MiB 下载上限。"],
   appUpdateHelp: ["Updates ClamAV Desktop from signed GitHub releases. Engine definitions are updated separately.", "GitHubの署名付きリリースからアプリを更新します。ウイルス定義の更新とは別です。", "从 GitHub 的签名发行版更新应用，与病毒库更新分开。"],
@@ -116,6 +125,11 @@ const copy = {
     "Downloaded data failed a trust check. Keep verification enabled and retry from the official source; inspect details if it repeats.",
     "取得データの信頼性を確認できません。検証を省略せず公式配布元から再取得し、繰り返す場合は詳細を確認してください。",
     "下载数据未通过信任验证。请勿跳过验证。请从官方来源重新下载；若再次失败，请检查详情。",
+  ],
+  diagnostic_cancelled: [
+    "The definition update stopped when the worker shut down. Start the worker and retry when ready.",
+    "バックグラウンド処理の終了に伴い定義更新を停止しました。再起動後に再試行できます。",
+    "后台进程退出时已停止病毒定义更新。重新启动后可重试。",
   ],
   diagnostic_timeout: [
     "The operation timed out. Check the network or engine response before retrying.",
@@ -705,6 +719,11 @@ const copy = {
     "正在下载官方软件包",
   ],
   verifying: ["Verifying signatures", "署名を検証中", "正在验证签名"],
+  checkingEngine: ["Checking engine", "エンジンを確認中", "正在检查引擎"],
+  exportingData: ["Exporting data", "データを出力中", "正在导出数据"],
+  quarantiningFile: ["Quarantining file", "ファイルを隔離中", "正在隔离文件"],
+  restoringFile: ["Restoring file", "ファイルを復元中", "正在恢复文件"],
+  recoveringTransfers: ["Recovering transfers", "転送を復旧中", "正在恢复传输"],
   updating: [
     "Updating virus definitions",
     "ウイルス定義を更新中",

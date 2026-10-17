@@ -30,7 +30,7 @@ impl Renderer {
         } else if let Some(window) = app.get_webview_window("activity") {
             window.close().map_err(err)?;
         }
-        let b = backend(app);
+        let b = backend(app)?;
         b.set_panel(floating, side)?;
         b.publish_cached(app);
         Ok(())

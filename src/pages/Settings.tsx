@@ -1,3 +1,4 @@
+import WorkerMode from "../components/WorkerMode";
 import AppUpdater from "../components/AppUpdater";
 import InfoHint from "../components/InfoHint";
 import useRetryBlock from "../useRetryBlock";
@@ -56,6 +57,7 @@ export default function Settings(props: ViewProps) {
           </button>
         </div>
       </section>
+      <WorkerMode {...props} />
       <AppUpdater {...props} />
       <Diagnostics {...props} />
       <DownloadCache {...props} />

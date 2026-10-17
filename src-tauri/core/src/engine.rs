@@ -19,6 +19,36 @@ pub fn freshclam(scan: &Path) -> Option<PathBuf> {
         .into_iter()
         .find(|p| p.is_file())
 }
+pub async fn refresh(c: &Core) -> Result<Engine> {
+    begin_inspection(c)?;
+    let result = inspect(c).await;
+    finish_inspection(c, result)
+}
+pub(crate) fn begin_inspection(c: &Core) -> Result<()> {
+    {
+        let mut document = c.document.lock().unwrap();
+        if document.operation.is_some()
+            || document
+                .scan
+                .as_ref()
+                .is_some_and(|scan| scan.status == "running")
+        {
+            return Err("busy".into());
+        }
+        document.operation = Some(Operation {
+            kind: "engine_inspection".into(),
+            stage: "checkingEngine".into(),
+            ..Default::default()
+        });
+    }
+    c.publish();
+    Ok(())
+}
+pub(crate) fn finish_inspection(c: &Core, result: Result<Engine>) -> Result<Engine> {
+    c.document.lock().unwrap().operation = None;
+    c.publish();
+    result
+}
 pub async fn inspect(c: &Core) -> Result<Engine> {
     let result = inspect_inner(c).await;
     if result.is_err() {
@@ -97,6 +127,11 @@ async fn inspect_inner(c: &Core) -> Result<Engine> {
     Ok(engine)
 }
 pub async fn update(c: &Core) -> Result<()> {
+    begin_update(c)?;
+    complete_update(c).await
+}
+
+pub(crate) fn begin_update(c: &Core) -> Result<()> {
     if crate::diagnostics::retry_blocked(&c, "definitions_update") {
         return Err("diagnostic_retry_wait".into());
     }
@@ -105,6 +140,8 @@ pub async fn update(c: &Core) -> Result<()> {
         if d.operation.is_some() || d.scan.as_ref().is_some_and(|s| s.status == "running") {
             return Err("busy".into());
         }
+        c.definitions_cancel
+            .store(false, std::sync::atomic::Ordering::Relaxed);
         d.operation = Some(Operation {
             kind: "definitions".into(),
             stage: "updating".into(),
@@ -112,6 +149,10 @@ pub async fn update(c: &Core) -> Result<()> {
         });
     }
     c.publish();
+    Ok(())
+}
+
+pub(crate) async fn complete_update(c: &Core) -> Result<()> {
     let result = update_inner(c).await;
     {
         let mut d = c.document.lock().unwrap();
@@ -126,6 +167,11 @@ pub async fn update(c: &Core) -> Result<()> {
     result
 }
 async fn update_inner(c: &Core) -> Result<()> {
+    if c.definitions_cancel
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        return Err("definitions_update_cancelled".into());
+    }
     let scan = discover().ok_or("engine_missing")?;
     let binary = freshclam(&scan).ok_or("freshclam_missing")?;
     let db = c.root.join("database");
@@ -143,7 +189,7 @@ async fn update_inner(c: &Core) -> Result<()> {
             format!("--config-file={}", config.display()),
             format!("--datadir={}", db.display()),
         ],
-        None,
+        Some(&c.definitions_cancel),
         Duration::from_secs(1800),
         |s| {
             tail.push_str(s);
@@ -168,6 +214,9 @@ async fn update_inner(c: &Core) -> Result<()> {
         },
     )
     .await?;
+    if result.cancelled {
+        return Err("definitions_update_cancelled".into());
+    }
     validate_update(result.code, &tail)?;
     if inspect(c).await?.database_path.as_deref() != Some(db.to_string_lossy().as_ref()) {
         return Err("definitions_missing".into());
@@ -184,6 +233,28 @@ fn validate_update(code: Option<i32>, tail: &str) -> Result<()> {
 #[cfg(test)]
 mod diagnostic_tests {
     use super::*;
+    #[tokio::test]
+    async fn shutdown_before_launch_records_cancellation_and_releases_operation() {
+        let root = PathBuf::from("/private/tmp")
+            .join(format!("clamav-update-cancel-{}", uuid::Uuid::new_v4()));
+        let core = Core::new(root.clone()).unwrap();
+        begin_update(&core).unwrap();
+        assert_eq!(begin_update(&core).unwrap_err(), "busy");
+        core.definitions_cancel
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            complete_update(&core).await.unwrap_err(),
+            "definitions_update_cancelled"
+        );
+        assert!(core.snapshot().operation.is_none());
+        assert!(core
+            .snapshot()
+            .diagnostics
+            .iter()
+            .any(|a| a.kind == "definitions_update" && a.code == "cancelled"));
+        drop(core);
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn cooldown_is_failure_even_when_freshclam_returns_zero() {
         let tail = "WARNING: FreshClam previously received error code 429

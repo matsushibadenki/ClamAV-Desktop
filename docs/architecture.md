@@ -2,7 +2,7 @@
 
 アプリ終了中の予約実行と任意のclamd対応は[背景サービスの実装計画](background-service-plan.md)を参照。共有処理はTauri非依存の`src-tauri/core` crateへ分離済み。通常はGUIプロセス内でCoreを所有する。[手動worker](worker.md)を先に起動した場合、GUIは起動時にIPCプロキシへ接続する。OSサービス登録とアプリ終了中の予約実行は未実装。
 
-workerは2スレッドのTokioで動作し、公開TCPポートを使わない。private socketの両側でOSのpeer UIDを確認する。GUIプロキシは最終受信状態の表示キャッシュだけを持ち、DB・取消フラグ・操作を所有しない。毎秒状態を取得し、切断時は3言語で通知して再接続を試みる。worker接続中はGUIのmaintenanceを起動しない。起動中のモード切り替えは未実装で、接続が失敗してもCoreを追加生成しない。未移行のコマンドはworker_operation_unavailableで拒否する。
+workerは2スレッドのTokioで動作し、公開TCPポートを使わない。private socketの両側でOSのpeer UIDを確認する。GUIプロキシは最終受信状態の表示キャッシュだけを持ち、DB・取消フラグ・操作を所有しない。毎秒状態を取得し、切断時は3言語で通知して再接続を試みる。worker接続中はGUIのmaintenanceが処理をスキップする。Rust Runtimeの参照管理で起動中の所有権交代を行い、切断だけではCoreを追加生成しない。明示的なGUI復帰にもOSの排他取得を必要とする。未移行のコマンドはworker_operation_unavailableで拒否する。
 
 Coreは`StateNotifier`を所有し、Snapshotを渡す。通知時はDocumentのMutexを解放しているため、通知先はCoreを再読取できる。GUIの`bridge.rs`だけがAppHandleとcore:stateイベントを扱う。検査タスクはArc<Core>を保持してTokio上で動き、ウインドウから独立している。Installerの画面起動とRendererはGUI側に残す。
 
@@ -40,3 +40,15 @@ FreshClamのuntil after形式の時刻はローカル時刻として読み取り
 アプリ更新はGUIプロセスのRust Serviceが所有する。チェック・取得・インストール・再起動の状態と、検証済み更新候補をRustに保持し、WebViewへはメタデータと進捗だけを通知する。Tauri公式プラグイン2.13.3に固定し、requireSignedVersionを有効にする。GitHubの当該リポジトリのHTTPSアーカイブ以外は拒否する。取得中の容量確認と取得後の128MiB確認を行い、署名・バージョン検証に成功したデータだけをinstallへ渡す。Coreのファイル操作ロックと共有Operationを使って検査・転送と競合しないようにし、成功時は再起動待ちを保持する。worker接続時のインストールは拒否する。診断JSONにはappUpdate状態を追加する。
 
 Settings writes are centralized in core/settings.rs. A Core-owned settings mutex orders SQLite commits and Document updates across concurrent clients; failed commits do not update Document. Both Tauri and worker IPC use this path. The additive save_settings command participates in the existing persistent request ledger, preserving at-most-once replay behavior.
+
+Worker definition updates reserve the shared operation before accepting a request, then run as a worker-owned task outside the IPC command mutex. The persistent request ledger records acceptance or rejection, not eventual completion; snapshots and diagnostics carry progress and outcome. A separate definition cancellation flag prevents scan-stop requests from cancelling updates. Shutdown cancels and joins the update task before releasing Core ownership.
+
+Integrity IPC uses an acceptance handshake from the blocking verifier after operation/file-lock acquisition. The worker retains its task through GUI disconnects, and caches up to 64 request-correlated completion results separately from the persistent command ledger. Tauri waits via short read-only result requests and propagates save errors while preserving the existing Detail return type. Shutdown requests cancellation and joins the blocking task without releasing Core early; stalled OS I/O can delay shutdown.
+
+Quarantine/restore/recovery share a Core operation wrapper in both local and worker modes. It acquires the file gate without queuing, reserves Document.operation under the document mutex, and clears/publishes the operation on normal completion or error. Worker file jobs use the same acceptance handshake and bounded result-cache pattern as integrity jobs; the existing durable command ledger prevents repeated mutations. Accepted file jobs are not cancelled at shutdown, and Core ownership is retained until they finish.
+
+History/quarantine/diagnostics exports and cache cleanup use the same file-job lifecycle. Core exports::Kind selects the schema; serialization and atomic private-file writing stay in the owning process. File-gate-held internal helpers avoid nested locking during report collection and output. Cache reads are offloaded to blocking tasks and do not consume the mutation ledger. GUI diagnostic metadata is bounded and optional; report bytes never cross IPC or WebView.
+
+Manual engine inspection reserves Document.operation, runs outside the IPC mutation mutex, and exposes bounded request-correlated Engine results. GUI and local modes share begin/finish handling. Core Ownership records its acquiring PID and explicitly LOCK_UNs only from that PID after other Core fields are dropped; CLOEXEC is retained. This prevents close-only release from being delayed by fork-inherited descriptors prior to exec without weakening active-owner exclusion.
+
+Live handoff is coordinated by `runtime.rs`. Backend leases and Core strong references prevent teardown while commands, scans, installer, updater or maintenance retain state. The GUI launches its own executable with a fixed `--worker` entry before Tauri initialization, avoiding a separately bundled helper. IPC `shutdown_if_idle` checks work and sets stopping under the mutation gate. The GUI acquires the OS lock before recreating Core; failed or timed-out startup cannot bypass ownership. GUI renderer placement is restored, while transient activity logs restart with the new owner. Production signature/notarization and service registration remain separate verification steps.

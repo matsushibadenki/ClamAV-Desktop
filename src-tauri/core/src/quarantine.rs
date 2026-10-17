@@ -35,15 +35,77 @@ pub(crate) fn safe_path(path: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Clone)]
+pub enum FileAction {
+    Quarantine(String),
+    Restore(String),
+    Recover,
+    CleanupCache,
+    Export {
+        kind: crate::exports::Kind,
+        destination: String,
+        app_update: Option<serde_json::Value>,
+    },
+}
+
 pub fn quarantine(c: &Core, id: &str) -> Result<()> {
-    let _gate = c.file_gate.lock().unwrap();
-    if c.snapshot()
-        .operation
-        .as_ref()
-        .is_some_and(|op| op.kind == "app_update")
+    run_file_operation(c, FileAction::Quarantine(id.into()), || {})
+}
+pub fn restore(c: &Core, id: &str) -> Result<()> {
+    run_file_operation(c, FileAction::Restore(id.into()), || {})
+}
+pub fn recover(c: &Core) -> Result<()> {
+    run_file_operation(c, FileAction::Recover, || {})
+}
+pub fn run_file_operation(c: &Core, action: FileAction, started: impl FnOnce()) -> Result<()> {
+    let _gate = c.file_gate.try_lock().map_err(|_| "busy")?;
+    let (kind, stage, target) = match &action {
+        FileAction::Quarantine(id) => ("quarantine", "quarantiningFile", Some(id.clone())),
+        FileAction::Restore(id) => ("restore", "restoringFile", Some(id.clone())),
+        FileAction::Recover => ("transfer_recovery", "recoveringTransfers", None),
+        FileAction::CleanupCache => ("cache_cleanup", "cleaning", None),
+        FileAction::Export { .. } => ("export", "exportingData", None),
+    };
     {
-        return Err("busy".into());
+        let mut document = c.document.lock().unwrap();
+        if document.operation.is_some()
+            || document
+                .scan
+                .as_ref()
+                .is_some_and(|scan| scan.status == "running")
+        {
+            return Err("busy".into());
+        }
+        document.operation = Some(Operation {
+            kind: kind.into(),
+            stage: stage.into(),
+            target_id: target,
+            ..Default::default()
+        });
     }
+    c.publish();
+    started();
+    let result = match action {
+        FileAction::Quarantine(id) => quarantine_inner(c, &id),
+        FileAction::Restore(id) => restore_inner(c, &id),
+        FileAction::Recover => refresh_items(c),
+        FileAction::CleanupCache => crate::downloads::cleanup_contents(c)
+            .map(|report| c.log("cache_cleaned", report.reclaimable_bytes.to_string())),
+        FileAction::Export {
+            kind,
+            destination,
+            app_update,
+        } => crate::exports::write_unlocked(c, kind, Path::new(&destination), app_update),
+    };
+    c.document.lock().unwrap().operation = None;
+    if let Err(reason) = &result {
+        c.log("error", reason);
+    } else {
+        c.publish();
+    }
+    result
+}
+fn quarantine_inner(c: &Core, id: &str) -> Result<()> {
     let finding = c
         .snapshot()
         .history
@@ -182,15 +244,7 @@ pub fn quarantine(c: &Core, id: &str) -> Result<()> {
     c.log("file_quarantined", source.to_string_lossy());
     Ok(())
 }
-pub fn restore(c: &Core, id: &str) -> Result<()> {
-    let _gate = c.file_gate.lock().unwrap();
-    if c.snapshot()
-        .operation
-        .as_ref()
-        .is_some_and(|op| op.kind == "app_update")
-    {
-        return Err("busy".into());
-    }
+fn restore_inner(c: &Core, id: &str) -> Result<()> {
     let mut item = c
         .snapshot()
         .quarantine

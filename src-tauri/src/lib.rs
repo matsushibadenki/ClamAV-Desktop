@@ -3,6 +3,7 @@ use clamav_desktop_core::{
     details, diagnostics, downloads, engine, model, process, quarantine, scanner, store,
 };
 mod bridge;
+mod runtime;
 use bridge::{backend, core, Backend};
 use clamav_desktop_core::ipc::{Command as WorkerCommand, Payload};
 mod installer;
@@ -10,7 +11,7 @@ mod renderer;
 use model::*;
 use std::sync::atomic::Ordering;
 use store::*;
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 fn main_window(window: &WebviewWindow) -> Result<()> {
     if window.label() != "main" {
         return Err("main_window_required".into());
@@ -47,11 +48,46 @@ fn restart_app_update(app: AppHandle, window: WebviewWindow) -> Result<()> {
 }
 #[tauri::command]
 async fn get_snapshot(app: AppHandle) -> Result<Snapshot> {
-    backend(&app).snapshot().await
+    backend(&app)?.snapshot().await
 }
 #[tauri::command]
-async fn refresh_engine(app: AppHandle) -> Result<Engine> {
-    engine::inspect(core(&app)?.as_ref()).await
+fn get_backend_status(app: AppHandle) -> runtime::Status {
+    app.state::<runtime::Runtime>().status()
+}
+#[tauri::command]
+async fn set_worker_mode(
+    app: AppHandle,
+    window: WebviewWindow,
+    worker: bool,
+) -> Result<runtime::Status> {
+    main_window(&window)?;
+    // An owned task completes handoff even if the invoking WebView disappears.
+    tauri::async_runtime::spawn(async move {
+        let executable = std::env::current_exe().map_err(err)?;
+        let result = app
+            .state::<runtime::Runtime>()
+            .switch(worker, executable, true)
+            .await;
+        // A recreated local Core starts without engine metadata. Refresh now,
+        // rather than displaying a missing engine until the next maintenance tick.
+        if let Ok(c) = core(&app) {
+            if !c.snapshot().engine.checked {
+                let _ = engine::refresh(&c).await;
+            }
+        }
+        let _ = app.emit("core:backend", app.state::<runtime::Runtime>().status());
+        if let Ok(backend) = backend(&app) {
+            backend.publish_cached(&app);
+        }
+        result
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
+async fn refresh_engine(app: AppHandle, window: WebviewWindow) -> Result<Engine> {
+    main_window(&window)?;
+    backend(&app)?.refresh_engine().await
 }
 #[tauri::command]
 async fn prepare_installer(app: AppHandle, window: WebviewWindow) -> Result<()> {
@@ -66,7 +102,15 @@ async fn open_installer(app: AppHandle, window: WebviewWindow) -> Result<()> {
 #[tauri::command]
 async fn update_definitions(app: AppHandle, window: WebviewWindow) -> Result<()> {
     main_window(&window)?;
-    engine::update(core(&app)?.as_ref()).await
+    match backend(&app)?.as_ref() {
+        Backend::Local(c) => engine::update(c).await,
+        Backend::Worker { client, .. } => {
+            match client.request(WorkerCommand::UpdateDefinitions).await? {
+                Payload::Ack => Ok(()),
+                _ => Err("ipc_invalid_response".into()),
+            }
+        }
+    }
 }
 #[tauri::command]
 async fn start_scan(
@@ -76,7 +120,7 @@ async fn start_scan(
     target: Option<String>,
 ) -> Result<String> {
     main_window(&window)?;
-    match backend(&app).inner() {
+    match backend(&app)?.as_ref() {
         Backend::Local(c) => scanner::start(c.clone(), kind, target).await,
         Backend::Worker { client, .. } => match client
             .request(WorkerCommand::StartScan { kind, target })
@@ -90,7 +134,7 @@ async fn start_scan(
 #[tauri::command]
 async fn stop_scan(app: AppHandle, window: WebviewWindow) -> Result<()> {
     main_window(&window)?;
-    match backend(&app).inner() {
+    match backend(&app)?.as_ref() {
         Backend::Local(c) => c.cancel.store(true, Ordering::Relaxed),
         Backend::Worker { client, .. } => {
             client.request(WorkerCommand::StopScan).await?;
@@ -109,33 +153,27 @@ async fn choose_folder(window: WebviewWindow) -> Result<Option<String>> {
 #[tauri::command]
 async fn quarantine_file(app: AppHandle, window: WebviewWindow, id: String) -> Result<()> {
     main_window(&window)?;
-    tauri::async_runtime::spawn_blocking(move || quarantine::quarantine(core(&app)?.as_ref(), &id))
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Quarantine(id))
         .await
-        .map_err(err)?
 }
 #[tauri::command]
 async fn restore_file(app: AppHandle, window: WebviewWindow, id: String) -> Result<()> {
     main_window(&window)?;
-    tauri::async_runtime::spawn_blocking(move || quarantine::restore(core(&app)?.as_ref(), &id))
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Restore(id))
         .await
-        .map_err(err)?
 }
 #[tauri::command]
 async fn recover_file_transfers(app: AppHandle, window: WebviewWindow) -> Result<()> {
     main_window(&window)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let c = core(&app)?;
-        let _gate = c.file_gate.lock().unwrap();
-        quarantine::refresh_items(&c)
-    })
-    .await
-    .map_err(err)?
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Recover)
+        .await
 }
 #[tauri::command]
 async fn get_download_cache(app: AppHandle) -> Result<downloads::CacheReport> {
-    tauri::async_runtime::spawn_blocking(move || downloads::report(core(&app)?.as_ref()))
-        .await
-        .map_err(err)?
+    backend(&app)?.download_cache().await
 }
 #[tauri::command]
 async fn cleanup_download_cache(
@@ -143,15 +181,14 @@ async fn cleanup_download_cache(
     window: WebviewWindow,
 ) -> Result<downloads::CacheReport> {
     main_window(&window)?;
-    tauri::async_runtime::spawn_blocking(move || downloads::cleanup(core(&app)?.as_ref()))
-        .await
-        .map_err(err)?
+    backend(&app)?
+        .file_operation(quarantine::FileAction::CleanupCache)
+        .await?;
+    backend(&app)?.download_cache().await
 }
 #[tauri::command]
 async fn get_quarantine_detail(app: AppHandle, id: String) -> Result<details::Detail> {
-    tauri::async_runtime::spawn_blocking(move || details::get(core(&app)?.as_ref(), &id))
-        .await
-        .map_err(err)?
+    backend(&app)?.quarantine_detail(id).await
 }
 #[tauri::command]
 async fn verify_quarantine_integrity(
@@ -160,35 +197,17 @@ async fn verify_quarantine_integrity(
     id: String,
 ) -> Result<details::Detail> {
     main_window(&window)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        details::verify(core(&app)?.as_ref(), &id)?;
-        details::get(core(&app)?.as_ref(), &id)
-    })
-    .await
-    .map_err(err)?
+    backend(&app)?.verify_integrity(id).await
 }
 #[tauri::command]
-fn stop_integrity_check(app: AppHandle, window: WebviewWindow) -> Result<()> {
+async fn stop_integrity_check(app: AppHandle, window: WebviewWindow) -> Result<()> {
     main_window(&window)?;
-    let c = core(&app)?;
-    {
-        let mut d = c.document.lock().unwrap();
-        if let Some(op) = d
-            .operation
-            .as_mut()
-            .filter(|op| op.kind == "integrity" && op.stage != "finishingIntegrity")
-        {
-            c.integrity_cancel.store(true, Ordering::Relaxed);
-            op.stage = "stoppingIntegrity".into();
-        }
-    }
-    c.publish();
-    Ok(())
+    backend(&app)?.stop_integrity().await
 }
+
 #[tauri::command]
 async fn export_quarantine(app: AppHandle, window: WebviewWindow) -> Result<Option<String>> {
     main_window(&window)?;
-    let c = core(&app)?;
     let Some(file) = rfd::AsyncFileDialog::new()
         .set_file_name("clamav-quarantine.json")
         .add_filter("JSON", &["json"])
@@ -197,19 +216,20 @@ async fn export_quarantine(app: AppHandle, window: WebviewWindow) -> Result<Opti
     else {
         return Ok(None);
     };
-    let destination = file.path().to_path_buf();
-    tauri::async_runtime::spawn_blocking(move || {
-        let bytes = serde_json::to_vec_pretty(&details::export(&c)?).map_err(err)?;
-        details::write_export(&c, &destination, &bytes)?;
-        Ok(Some(destination.to_string_lossy().into()))
-    })
-    .await
-    .map_err(err)?
+    let destination = file.path().to_str().ok_or("invalid_path")?.to_string();
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Export {
+            kind: clamav_desktop_core::exports::Kind::Quarantine,
+            destination: destination.clone(),
+            app_update: None,
+        })
+        .await?;
+    Ok(Some(destination))
 }
+
 #[tauri::command]
 async fn export_diagnostics(app: AppHandle, window: WebviewWindow) -> Result<Option<String>> {
     main_window(&window)?;
-    let c = core(&app)?;
     let Some(file) = rfd::AsyncFileDialog::new()
         .set_file_name("clamav-diagnostics.json")
         .add_filter("JSON", &["json"])
@@ -218,27 +238,24 @@ async fn export_diagnostics(app: AppHandle, window: WebviewWindow) -> Result<Opt
     else {
         return Ok(None);
     };
-    let destination = file.path().to_path_buf();
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut report = serde_json::to_value(diagnostics::report(&c)?).map_err(err)?;
-        if let Some(fields) = report.as_object_mut() {
-            fields.insert(
-                "appUpdate".into(),
+    let destination = file.path().to_str().ok_or("invalid_path")?.to_string();
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Export {
+            kind: clamav_desktop_core::exports::Kind::Diagnostics,
+            destination: destination.clone(),
+            app_update: Some(
                 serde_json::to_value(app.state::<app_updater::Service>().snapshot())
                     .map_err(err)?,
-            );
-        }
-        let bytes = serde_json::to_vec_pretty(&report).map_err(err)?;
-        details::write_export(&c, &destination, &bytes)?;
-        Ok(Some(destination.to_string_lossy().into()))
-    })
-    .await
-    .map_err(err)?
+            ),
+        })
+        .await?;
+    Ok(Some(destination))
 }
+
 #[tauri::command]
 async fn save_settings(app: AppHandle, window: WebviewWindow, settings: Settings) -> Result<()> {
     main_window(&window)?;
-    backend(&app).save_settings(settings).await
+    backend(&app)?.save_settings(settings).await
 }
 
 #[tauri::command]
@@ -248,7 +265,6 @@ fn set_activity_panel(app: AppHandle, floating: bool, side: Option<String>) -> R
 #[tauri::command]
 async fn export_history(app: AppHandle, window: WebviewWindow) -> Result<Option<String>> {
     main_window(&window)?;
-    let c = core(&app)?;
     let Some(file) = rfd::AsyncFileDialog::new()
         .set_file_name("clamav-history.json")
         .add_filter("JSON", &["json"])
@@ -257,10 +273,17 @@ async fn export_history(app: AppHandle, window: WebviewWindow) -> Result<Option<
     else {
         return Ok(None);
     };
-    let bytes = serde_json::to_vec_pretty(&c.snapshot().history).map_err(err)?;
-    tokio::fs::write(file.path(), bytes).await.map_err(err)?;
-    Ok(Some(file.path().to_string_lossy().into()))
+    let destination = file.path().to_str().ok_or("invalid_path")?.to_string();
+    backend(&app)?
+        .file_operation(quarantine::FileAction::Export {
+            kind: clamav_desktop_core::exports::Kind::History,
+            destination: destination.clone(),
+            app_update: None,
+        })
+        .await?;
+    Ok(Some(destination))
 }
+
 #[tauri::command]
 fn open_privacy_settings(window: WebviewWindow) -> Result<()> {
     main_window(&window)?;
@@ -289,13 +312,19 @@ fn runtime_set(c: &Core, key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 async fn maintenance(app: AppHandle) {
-    let Ok(c) = core(&app) else {
-        return;
-    };
-    let _ = engine::inspect(&c).await;
+    if let Ok(c) = core(&app) {
+        let _ = engine::inspect(&c).await;
+    }
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        let Ok(c) = core(&app) else {
+            continue;
+        };
         let snapshot = c.snapshot();
+        if !snapshot.engine.checked {
+            let _ = engine::inspect(&c).await;
+            continue;
+        }
         if snapshot.operation.is_some()
             || snapshot
                 .scan
@@ -341,7 +370,7 @@ pub fn run() {
             let root = std::env::var_os("CLAMAV_DESKTOP_DEV_DATA_DIR")
                 .map(std::path::PathBuf::from)
                 .unwrap_or(root);
-            let state = tauri::async_runtime::block_on(Backend::open(
+            let state = tauri::async_runtime::block_on(runtime::Runtime::open(
                 root,
                 std::sync::Arc::new(bridge::TauriNotifier(app.handle().clone())),
             )).map_err(|reason| {
@@ -354,28 +383,28 @@ pub fn run() {
                 }
                 std::io::Error::other(reason)
             })?;
-            let remote = matches!(&state, Backend::Worker { .. });
             app.manage(state);
-            let handle = app.handle().clone();
-            if remote { tauri::async_runtime::spawn(bridge::poll_worker(handle)); }
-            else { tauri::async_runtime::spawn(maintenance(handle)); }
+            tauri::async_runtime::spawn(bridge::poll_worker(app.handle().clone()));
+            tauri::async_runtime::spawn(maintenance(app.handle().clone()));
             Ok(())
         })
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if window.state::<runtime::Runtime>().status().transitioning { api.prevent_close(); }
                     if window.try_state::<app_updater::Service>().is_some_and(|s| matches!(s.snapshot().phase.as_str(), "downloading" | "installing")) { api.prevent_close(); }
                 }
             }
             if window.label() == "activity" && matches!(event, tauri::WindowEvent::Destroyed) {
-                let b = backend(window.app_handle());
-                let _ = b.set_panel(false, None);
-                b.publish_cached(window.app_handle());
+                if let Ok(b) = backend(window.app_handle()) {
+                    let _ = b.set_panel(false, None);
+                    b.publish_cached(window.app_handle());
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             get_app_update, check_app_update, install_app_update, restart_app_update,
-            get_snapshot,
+            get_snapshot, get_backend_status, set_worker_mode,
             get_download_cache,
             cleanup_download_cache,
             get_quarantine_detail,
@@ -402,6 +431,7 @@ pub fn run() {
         .expect("unable to launch ClamAV Desktop")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if app.state::<runtime::Runtime>().status().transitioning { api.prevent_exit(); }
                 if app.try_state::<app_updater::Service>().is_some_and(|s| matches!(s.snapshot().phase.as_str(), "downloading" | "installing")) { api.prevent_exit(); }
             }
         });

@@ -1,6 +1,6 @@
 //! Only aged, recognizable installer attempts inside the private cache are removable.
 use crate::{quarantine::safe_path, store::*};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::Path,
@@ -8,7 +8,7 @@ use std::{
 };
 #[cfg(test)]
 const RETENTION: Duration = Duration::from_secs(30 * 24 * 3600);
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CacheReport {
     pub bytes: u64,
@@ -133,16 +133,7 @@ pub fn cleanup(c: &Core) -> Result<CacheReport> {
         });
     }
     c.publish();
-    let result = {
-        let prepared = c.prepared.lock().unwrap();
-        manage(
-            &c.root.join("downloads"),
-            prepared.as_ref().map(|(p, _)| p.as_path()),
-            SystemTime::now(),
-            true,
-            Duration::from_secs(c.snapshot().settings.download_retention_days as u64 * 86400),
-        )
-    };
+    let result = cleanup_contents(c);
     c.document.lock().unwrap().operation = None;
     c.log(
         if result.is_ok() {
@@ -157,6 +148,19 @@ pub fn cleanup(c: &Core) -> Result<CacheReport> {
     );
     result
 }
+pub(crate) fn cleanup_contents(c: &Core) -> Result<CacheReport> {
+    {
+        let prepared = c.prepared.lock().unwrap();
+        manage(
+            &c.root.join("downloads"),
+            prepared.as_ref().map(|(p, _)| p.as_path()),
+            SystemTime::now(),
+            true,
+            Duration::from_secs(c.snapshot().settings.download_retention_days as u64 * 86400),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

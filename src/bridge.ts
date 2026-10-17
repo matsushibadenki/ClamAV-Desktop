@@ -71,6 +71,8 @@ export function useCore() {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 type Command =
+  | "get_backend_status"
+  | "set_worker_mode"
   | "get_app_update"
   | "check_app_update"
   | "install_app_update"
