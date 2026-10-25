@@ -12,7 +12,9 @@ if (versions.some(value => value !== version)) throw new Error('Synchronize all 
 const args = process.argv.slice(2);
 const signed = args.includes('--signed');
 const check = args.includes('--check');
-if (args.some(a => !['--signed','--development','--check'].includes(a)) || signed === args.includes('--development')) throw new Error('Choose --signed or --development.');
+const prepareOnly = args.includes('--prepare-only');
+if (args.some(a => !['--signed','--development','--check','--prepare-only'].includes(a)) || signed === args.includes('--development')) throw new Error('Choose --signed or --development.');
+if (prepareOnly && (!signed || check)) throw new Error('--prepare-only requires --signed without --check.');
 if (process.platform !== 'darwin') throw new Error('macOS is required.');
 const environment = { ...process.env, CI: 'true' };
 function run(command, argv, capture = false, env = environment) {
@@ -30,7 +32,7 @@ if (signed) {
   if (!requested && available.length && available.every(item => item[2] === available[0][2])) identity = available[0];
   if (!identity) throw new Error('Select a valid Developer ID Application certificate with APPLE_SIGNING_IDENTITY.');
   environment.APPLE_SIGNING_IDENTITY = identity[1]; // Hash avoids ambiguous duplicate certificate names.
-  run('/usr/bin/xcrun',['notarytool','history',...notaryCredentials,'--output-format','json'],true);
+  if (!prepareOnly) run('/usr/bin/xcrun',['notarytool','history',...notaryCredentials,'--output-format','json'],true);
   if (!environment.TAURI_SIGNING_PRIVATE_KEY && !environment.TAURI_SIGNING_PRIVATE_KEY_PATH) {
     const localKey = join(root,'.secrets/updater.key');
     if (!existsSync(localKey)) throw new Error('Updater signing key is required.');
@@ -63,6 +65,13 @@ let updater;
 if (signed) {
   const zip = join(output,'notarization.zip');
   run('/usr/bin/ditto',['-c','-k','--keepParent',app,zip]);
+  if (prepareOnly) {
+    run('/usr/bin/codesign',['--verify','--deep','--strict',app]);
+    console.log(`Prepared signed app for review: ${app}`);
+    console.log(`Notarization payload: ${zip}\nSHA-256: ${checksum(readFileSync(zip))}`);
+    console.log('No notarization submission, distribution manifest or GitHub publication was performed.');
+    process.exit(0);
+  }
   notarize(zip); rmSync(zip);
   run('/usr/bin/xcrun',['stapler','staple',app]);
   run('/usr/bin/xcrun',['stapler','validate',app]);

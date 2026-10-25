@@ -14,6 +14,8 @@ node scripts/merge-updater.mjs release-output
 
 `APPLE_KEYCHAIN_PROFILE`でプロファイル名を変更できる。`APPLE_NOTARY_KEYCHAIN`は専用キーチェーンを使用するCI向け。ローカルのApple資格情報を環境変数へ展開する必要はない。
 
+公証申請の前にローカル成果物だけを準備する場合は`npm run release:mac -- --prepare-only`を使用する。テスト・Developer ID署名・署名検証まで実行し、公証用ZIPとSHA-256を出力して停止する。Appleへの公証申請・DMG生成・配布メタデータ生成・GitHub公開は行わない。その後、通常の`npm run release:mac`で公証を含む正式処理を行う。
+
 処理順は、テスト→Developer ID署名→アプリの公証・staple・Gatekeeper確認→公証済みアプリを含むDMGの生成→DMGの公証・staple→更新アーカイブの生成・署名→更新署名と改変拒否の検証→SHA-256。公証に成功する前のアプリを更新アーカイブへ入れない。
 
 出力は`src-tauri/target/release/bundle/`以下。`release-output/`には検証済みDMG、更新用`.app.tar.gz`、`.sig`、`latest.json`、SHA256SUMS、release.jsonだけを集める。現時点の正式ビルドはApple Silicon用。Intel・Universal・macOS 12実機は別途検証する。
