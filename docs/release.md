@@ -62,9 +62,9 @@ ad-hoc署名。Appleおよび更新署名の秘密情報を環境から除外す
 
 package.json、package-lock.json、src-tauri/Cargo.toml、src-tauri/core/Cargo.toml、src-tauri/tauri.conf.jsonを同期する。配布手順は不一致を拒否する。依存関係はロックファイルを使用し、更新署名の公開鍵は既存クライアントの更新が必要な限り維持する。
 
-English: Software updates use signed GitHub archives with mandatory signed-version verification. The local notarization profile is `clamav-desktop`. GitHub Hosted CI needs its own release Secrets; it creates drafts only. Back up the ignored updater private key. End-to-end upgrades from a published newer version and Intel/macOS 12 validation are pending.
+English: Software updates use signed GitHub archives with mandatory signed-version verification. The local notarization profile is `clamav-desktop`. GitHub Hosted CI needs its own release Secrets; it creates drafts only. Back up the ignored updater private key. Actual download, replacement and automatic restart were validated with a repaired QA client updating to public 0.3.1. Original 0.2.0/0.3.0 clients require a one-time manual DMG migration. Intel/macOS 12 validation remains pending.
 
-简体中文：软件更新使用 GitHub 的签名归档，并强制验证签名中的版本。本地公证配置名为 `clamav-desktop`。GitHub 托管 CI 需要单独设置发行 Secrets，流程只创建草稿。请备份已排除在 Git 外的更新私钥。发布新版本后的完整更新流程，以及 Intel/macOS 12 实机验证仍待完成。
+简体中文：软件更新使用 GitHub 的签名归档，并强制验证签名中的版本。本地公证配置名为 `clamav-desktop`。GitHub 托管 CI 需要单独设置发行 Secrets，流程只创建草稿。请备份已排除在 Git 外的更新私钥。已使用修复后的测试客户端验证实际下载、替换及自动重启至公开版 0.3.1。原始 0.2.0/0.3.0 客户端需要先手动安装一次 DMG。Intel/macOS 12 实机验证仍待完成。
 
 ## GitHub CIの確認結果（2026-10-14）
 
@@ -72,7 +72,7 @@ English: Software updates use signed GitHub archives with mandatory signed-versi
 
 更新署名鍵はチャットへ提示されたため、鍵移行を推奨する。v0.2.0は現行公開鍵で公開済みのため、単純な鍵差し替えでは既存クライアントの更新が失敗する。互換性を保つ移行計画または再インストール案内を用意する。
 
-[公開v0.2.0](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.2.0)の`latest.json`、DMG、更新アーカイブを認証なしで取得し、署名情報・SHA-256が検証済み成果物と一致することを確認した。より新しい版への実インストールと再起動は未検証。
+[公開v0.2.0](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.2.0)の`latest.json`、DMG、更新アーカイブを認証なしで取得し、署名情報・SHA-256が検証済み成果物と一致することを確認した。当時は実インストールと再起動が未検証だった。2026-10-25の結果は下記を参照。
 
 
 ## 実更新で判明した互換性問題（2026-10-25）
@@ -82,3 +82,10 @@ English: Software updates use signed GitHub archives with mandatory signed-versi
 0.3.1では既存のModalを使った明示確認に変更し、アーカイブ生成時に`COPYFILE_DISABLE=1`を指定する。macOSの`tar -t`はAppleDoubleを隠すため、Python 3標準ライブラリのtarfileで実エントリーを検証し、単一.app以外・AppleDouble・不正パス・必須ファイル不足を配布前に拒否する。配布スクリプトにはPython 3も必要。
 
 既にインストールされた0.2.0 / 0.3.0のUIは更新先アーカイブでは修復できない。利用者には修正版DMGからの一度の手動移行を案内する。公開済みアーカイブの差し替えや、署名・確認の迂回は行わない。更新公開鍵は維持し、鍵移行は別途互換性を保つ手順で行う。
+
+
+### 0.3.1の公開と実更新結果
+
+[公開0.3.1](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.1)は署名・公証・更新署名・改変拒否・実展開後の署名を確認済み。修正した検証用クライアント（表示版0.2.0、実際の配信URLと署名検証を使用）から公開アーカイブを取得し、置換・アプリ自身の再起動・0.3.1での更新確認まで成功した。UI再接続前にPID交代を観測し、テストツールによる再起動ではないことを確認した。元の公開0.2.0からの成功を意味しない。
+
+既存の設定値・検査履歴・隔離記録・未完了転送を保持。旧設定に欠けていた保持期間30日・容量上限1024MiBは既存の互換既定値として保存された。検証は一時フォルダのアプリコピーで行い、`/Applications`のアプリは置き換えていない。詳しい証跡は[検証記録](verification.md)を参照。
