@@ -181,6 +181,7 @@ pub struct Report {
     pub state: Snapshot,
     pub quarantine_details: Option<crate::details::Export>,
     pub download_cache: Option<crate::downloads::CacheReport>,
+    pub scheduled_runs: Option<Vec<crate::scheduler::Run>>,
     pub collection_errors: Vec<String>,
 }
 pub fn report(c: &Core) -> Result<Report> {
@@ -206,7 +207,15 @@ fn report_with(c: &Core, quarantine: Result<crate::details::Export>) -> Result<R
             None
         }
     };
+    let scheduled_runs = match crate::scheduler::records(&c.db.lock().unwrap()) {
+        Ok(records) => Some(records),
+        Err(reason) => {
+            collection_errors.push(format!("scheduled_runs: {reason}"));
+            None
+        }
+    };
     Ok(Report {
+        scheduled_runs,
         schema_version: 1,
         exported_at: now(),
         app_version: env!("CARGO_PKG_VERSION").into(),

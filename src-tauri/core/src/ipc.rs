@@ -422,6 +422,52 @@ struct ServiceState {
     file_result: Arc<std::sync::Mutex<std::collections::VecDeque<(String, Option<Result<()>>)>>>,
 }
 impl ServiceState {
+    fn maintenance_tick(&self, clock: &impl crate::scheduler::Clock) -> Result<()> {
+        self.maintenance_tick_with(clock, |core| async move {
+            let _ = crate::engine::complete_update(&core).await;
+        })
+    }
+    fn maintenance_tick_with<F, Fut>(
+        &self,
+        clock: &impl crate::scheduler::Clock,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(Arc<Core>) -> Fut,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        // The same gate as ShutdownIfIdle and all mutations. No new automatic
+        // job can slip in after stopping, nor can repeated timer ticks queue up.
+        let Ok(_commands) = self.commands.try_lock() else {
+            return Ok(());
+        };
+        let Ok(_maintenance) = self.core.maintenance_gate.try_lock() else {
+            return Ok(());
+        };
+        if self.stopping.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        match crate::scheduler::plan(&self.core, clock)? {
+            crate::scheduler::Action::None => Ok(()),
+            crate::scheduler::Action::Scan { date, id } => {
+                crate::scheduler::start_claimed(&self.core, &date, &id, clock)
+            }
+            crate::scheduler::Action::Update { at } => {
+                let Ok(mut slot) = self.definition_job.try_lock() else {
+                    return Ok(());
+                };
+                if slot.as_ref().is_some_and(|job| !job.is_finished()) {
+                    return Ok(());
+                }
+                if crate::scheduler::begin_auto_update(&self.core, at)? {
+                    let core = self.core.clone();
+                    *slot = Some(tokio::spawn(update(core)));
+                }
+                Ok(())
+            }
+        }
+    }
+
     async fn start_inspection_job<F, Fut>(&self, request_id: String, run: F) -> Result<Payload>
     where
         F: FnOnce(Arc<Core>) -> Fut,
@@ -749,7 +795,12 @@ impl ServiceState {
             }
             Command::ShutdownIfIdle => {
                 let document = self.core.document.lock().unwrap();
-                if document.operation.is_some() || document.scan.as_ref().is_some_and(|scan| scan.status == "running") {
+                if document.operation.is_some()
+                    || document
+                        .scan
+                        .as_ref()
+                        .is_some_and(|scan| scan.status == "running")
+                {
                     Err("busy".into())
                 } else {
                     // Serialized with all mutation requests: no new job may be
@@ -860,13 +911,26 @@ impl Server {
         &self.socket.path
     }
     pub async fn run(self, stop: impl Future<Output = ()>) -> Result<()> {
+        self.run_inner(stop, false).await
+    }
+    pub async fn run_scheduled(self, stop: impl Future<Output = ()>) -> Result<()> {
+        self.run_inner(stop, true).await
+    }
+    async fn run_inner(self, stop: impl Future<Output = ()>, scheduled: bool) -> Result<()> {
         tokio::pin!(stop);
+        let mut maintenance = tokio::time::interval(Duration::from_secs(30));
+        maintenance.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let permits = Arc::new(Semaphore::new(8));
         let mut tasks = JoinSet::new();
         loop {
             tokio::select! {
                 _ = &mut stop => break,
                 _ = self.state.shutdown.notified() => break,
+                _ = maintenance.tick(), if scheduled => {
+                    if let Err(reason) = self.state.maintenance_tick(&crate::scheduler::SystemClock) {
+                        self.state.core.log("error", format!("scheduler: {reason}"));
+                    }
+                }
                 Some(_) = tasks.join_next(), if !tasks.is_empty() => (),
                 accepted = self.listener.accept() => {
                     let (stream, _) = accepted.map_err(err)?;
@@ -940,6 +1004,66 @@ impl Server {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn automatic_update_uses_owned_job_and_cannot_start_after_shutdown() {
+        let root =
+            PathBuf::from("/private/tmp").join(format!("clamav-auto-{}", uuid::Uuid::new_v4()));
+        let core = Arc::new(Core::new(root.clone()).unwrap());
+        {
+            let mut doc = core.document.lock().unwrap();
+            doc.settings.auto_update = true;
+            doc.engine.checked = true;
+            doc.engine.version = Some("fixture".into());
+        }
+        let server = Server::bind(core.clone()).unwrap();
+        // Stand-in child exercises actual cancel/reap logic without any CDN request.
+        server
+            .state
+            .maintenance_tick_with(&crate::scheduler::SystemClock, |core| async move {
+                let outcome = crate::process::run(
+                    Path::new("/bin/sleep"),
+                    &["30".into()],
+                    Some(&core.definitions_cancel),
+                    Duration::from_secs(40),
+                    |_| {},
+                )
+                .await
+                .unwrap();
+                assert!(outcome.cancelled);
+                core.document.lock().unwrap().operation = None;
+            })
+            .unwrap();
+        assert_eq!(core.snapshot().operation.unwrap().kind, "definitions");
+        server
+            .state
+            .maintenance_tick_with(&crate::scheduler::SystemClock, |_| async {
+                panic!("duplicate automatic update");
+            })
+            .unwrap();
+        let state = server.state.clone();
+        let task = tokio::spawn(server.run(std::future::pending()));
+        let client = Client::new(root.clone()).unwrap();
+        assert_eq!(
+            client.request(Command::ShutdownIfIdle).await.err().unwrap(),
+            "busy"
+        );
+        client.request(Command::Shutdown).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(3), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        state
+            .maintenance_tick_with(&crate::scheduler::SystemClock, |_| async {
+                panic!("started after stopping");
+            })
+            .unwrap();
+        assert!(core.snapshot().operation.is_none());
+        drop(state);
+        drop(core);
+        drop(Core::new(root.clone()).unwrap());
+        fs::remove_dir_all(root).unwrap();
+    }
     #[tokio::test]
     async fn inspection_keeps_control_requests_responsive_and_shutdown_awaits_result() {
         let root = PathBuf::from("/private/tmp")

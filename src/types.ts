@@ -46,7 +46,19 @@ export interface QuarantineItem {
   mode: number;
   status: string;
 }
+export interface ScheduledRun {
+  localDate: string;
+  localHour: number;
+  scheduledAt: string | null;
+  deadline: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  status: string;
+  reason: string | null;
+  detail: string | null;
+}
 export interface Snapshot {
+  scheduledRun?: ScheduledRun | null;
   engine: Engine;
   scan: Scan | null;
   history: Scan[];

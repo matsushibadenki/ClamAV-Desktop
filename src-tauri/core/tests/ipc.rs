@@ -43,11 +43,20 @@ async fn idle_shutdown_rejects_live_work_and_replays_the_busy_result() {
     let client = Client::new(fixture.0.clone()).unwrap();
     core.document.lock().unwrap().operation = Some(Default::default());
     let request = Request::new(Command::ShutdownIfIdle);
-    assert_eq!(client.send(&request).await.unwrap().error.as_deref(), Some("busy"));
+    assert_eq!(
+        client.send(&request).await.unwrap().error.as_deref(),
+        Some("busy")
+    );
     assert!(!core.cancel.load(Ordering::Relaxed));
     core.document.lock().unwrap().operation = None;
-    assert_eq!(client.send(&request).await.unwrap().error.as_deref(), Some("busy"));
-    assert!(matches!(client.request(Command::GetSnapshot).await.unwrap(), Payload::Snapshot(_)));
+    assert_eq!(
+        client.send(&request).await.unwrap().error.as_deref(),
+        Some("busy")
+    );
+    assert!(matches!(
+        client.request(Command::GetSnapshot).await.unwrap(),
+        Payload::Snapshot(_)
+    ));
     client.request(Command::ShutdownIfIdle).await.unwrap();
     server.await.unwrap().unwrap();
     assert!(!fixture.0.join("worker.sock").exists());

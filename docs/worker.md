@@ -1,6 +1,6 @@
 # Worker / local IPC
 
-現在は手動起動・GUIからの切替に対応。ログイン時の登録、アプリ終了中の予約は未実装。
+現在は手動起動・GUIからの切替と、起動済みworkerによる予約検査・定義自動更新に対応。GUIを終了してもworkerは継続する。ログイン時の自動起動登録は未実装。
 
 ## 実装済み
 
@@ -15,8 +15,8 @@
 - 🟢 [Done] 履歴・隔離・診断JSONのworker内生成と保存、ダウンロード容量確認・削除。ネイティブ保存先選択はGUIが担当。
 - 🟢 [Done] エンジン再確認の非同期IPCと、fork継承FDに起因する通常終了後の所有権取得エラーの修正。
 - 🟢 [Done] 起動中GUIからのworker起動・所有権交代とGUI復帰。実行中参照・処理・準備済みInstallerがある場合は拒否し、切替時にパネル配置を保持。
-- 🟠 [Next] workerの予約claim・missed判定・自動定義更新。
-- 🔴 [Later] LaunchAgent登録。
+- 🟢 [Done] workerの予約claim・missed判定・定義自動更新。GUIと同じ共有スケジューラーを使用。
+- 🟠 [Next] LaunchAgent登録・解除と許可状態の表示。
 - ⭕️ [Pending] worker入口を含む正式配布版の署名・公証・権限検証。
 - ⭕️ [Pending] helper固有のFull Disk Access、別ユーザーからの実接続拒否、ログイン・スリープ・macOS 12 / Intelでの確認。
 
@@ -67,9 +67,9 @@ src-tauri/target/debug/clamav-worker request --data-dir /private/tmp/clamav-work
 
 OSの所有権ロックを保持したCoreだけがsocketを作る。同じCoreでの二重bindも拒否する。終了時は自身が作ったinodeのsocketだけを削除する。リンク・通常ファイル・公開権限の既存socketを勝手に削除しない。任意のシェル・SQL・実行ファイルを指定する命令はない。
 
-English: This is a manually started development worker with authenticated local IPC and startup-time GUI attachment. Live GUI ownership switching is implemented. Scheduling and service registration remain unfinished; engine installation and app replacement require local mode.
+English: This is a manually started development worker with authenticated local IPC and startup-time GUI attachment. Live GUI ownership switching is implemented. Scheduling is supported while the worker runs; login service registration remains unfinished; engine installation and app replacement require local mode.
 
-简体中文：目前为手动启动的开发版后台进程，支持经过身份检查的本地通信及 GUI 启动时连接。已支持 GUI 运行中的所有权切换。定时执行和服务注册尚未完成；安装引擎与替换应用需要本地模式。
+简体中文：目前为手动启动的开发版后台进程，支持经过身份检查的本地通信及 GUI 启动时连接。已支持 GUI 运行中的所有权切换。后台运行期间已支持定时执行，登录服务注册尚未完成；安装引擎与替换应用需要本地模式。
 
 ## 設定保存（2026-10-16）
 
@@ -77,11 +77,11 @@ English: This is a manually started development worker with authenticated local 
 
 IPC v1への追加コマンドであり、既存4コマンドの形式は変更しない。設定保存には更新後のGUIとworkerを組み合わせる。旧workerは追加コマンドを処理できない。
 
-自動定義更新と毎日の予約検査は設定として保持するが、手動workerにはまだスケジューラーがない。通常のGUIローカルモードへ戻るまで自動実行しない。3言語の情報アイコンのヘルプにもこの制約を記載。
+当初は設定保存のみだったが、2026-10-25にworker内の自動定義更新と毎日の予約検査を実装した。実行条件は下記「予約実行」を参照。
 
-English: Settings can now be saved through authenticated IPC, using the same Rust validation and persistence as local mode. Duplicate requests never overwrite newer settings. Scheduling in the manually launched worker is still unavailable.
+English: Settings can now be saved through authenticated IPC, using the same Rust validation and persistence as local mode. Duplicate requests never overwrite newer settings. Scheduling was subsequently implemented on 2026-10-25.
 
-简体中文：现在可通过经过身份检查的本地通信保存设置，与本地模式共用 Rust 校验及持久化逻辑。重复请求不会覆盖较新的设置。手动后台进程尚不支持定时任务。
+简体中文：现在可通过经过身份检查的本地通信保存设置，与本地模式共用 Rust 校验及持久化逻辑。重复请求不会覆盖较新的设置。后台定时任务已于 2026-10-25 实现。
 
 ## 手動定義更新（2026-10-17）
 
@@ -91,11 +91,11 @@ English: Settings can now be saved through authenticated IPC, using the same Rus
 
 長時間処理はIPC命令ロックを保持しない。状態取得・設定保存・検査停止・worker終了を処理できる。更新中の追加更新や検査開始は共有操作状態により拒否する。終了時は定義更新専用の停止フラグを立て、子プロセスを停止・回収してジョブ終了を待つ。上限30秒で応答しなければジョブを中断して`worker_stop_timeout`とする。停止結果は診断へ保存し、3言語で再試行を案内する。
 
-自動更新・予約実行・アプリ自体のソフトウェア更新のIPC対応は引き続き未実装。
+自動定義更新・予約実行は2026-10-25に追加。アプリ自体のソフトウェア更新のIPC対応は未実装。
 
-English: Manual definition updates now return an acceptance acknowledgement immediately. Progress and final diagnostics remain worker-owned; closing the GUI does not stop the job. Shutdown cancels and awaits the update child. Automatic scheduling is still unavailable.
+English: Manual definition updates now return an acceptance acknowledgement immediately. Progress and final diagnostics remain worker-owned; closing the GUI does not stop the job. Shutdown cancels and awaits the update child. Automatic scheduling was added on 2026-10-25.
 
-简体中文：手动更新病毒定义现在会立即返回已受理响应。进度和最终诊断由后台进程管理，关闭 GUI 不会停止更新。后台退出时会停止并等待更新子进程。自动定时更新仍未实现。
+简体中文：手动更新病毒定义现在会立即返回已受理响应。进度和最终诊断由后台进程管理，关闭 GUI 不会停止更新。后台退出时会停止并等待更新子进程。自动定时更新已于 2026-10-25 实现。
 
 ## 隔離詳細・整合性確認（2026-10-17）
 
@@ -168,6 +168,22 @@ worker→GUIは新しい`shutdown_if_idle`を使う。変更要求と同じゲ�
 
 設定・履歴・隔離記録はSQLiteから読み直し、ログパネルの左右・独立表示はGUIのRust状態から引き継ぐ。セッション中の操作ログは所有者変更でリセットされる。準備済みInstallerの保護を失わないよう、その状態では切替を拒否し3言語で案内する。未保存の設定はworkerへ送らない。GUIへ戻った際はエンジンを即時再確認する。
 
-English: Settings now supports live app/worker handoff. Active leases and operations block transfer; startup failure recovers only with exclusive ownership. The application executable hosts the same headless worker before Tauri starts. Atomic idle shutdown protects concurrent jobs. Login startup, scheduling and signed-release validation remain pending.
+English: Settings now supports live app/worker handoff. Active leases and operations block transfer; startup failure recovers only with exclusive ownership. The application executable hosts the same headless worker before Tauri starts. Atomic idle shutdown protects concurrent jobs. Login startup and signed-release validation remain pending; scheduling was added on 2026-10-25.
 
-简体中文：设置现支持应用与后台进程之间实时移交。活动引用或操作会阻止切换；启动失败时仅在取得独占锁后恢复。应用可执行文件在 Tauri 初始化前运行共享后台入口，空闲检查与停止为原子操作。登录启动、定时任务和正式签名发行版验证仍待完成。
+简体中文：设置现支持应用与后台进程之间实时移交。活动引用或操作会阻止切换；启动失败时仅在取得独占锁后恢复。应用可执行文件在 Tauri 初始化前运行共享后台入口，空闲检查与停止为原子操作。登录启动和正式签名发行版验证仍待完成；定时任务已于 2026-10-25 实现。
+
+## 予約実行（2026-10-25）
+
+GUIローカルモードとworkerは、共有コアの同じスケジューラーを30秒ごとに評価する。worker接続中のGUIは実行せず、所有者だけが予約と定義更新を開始する。起動済みworkerはGUIを閉じた後も実行するが、OSのログイン登録・スリープ解除は行わない。
+
+予約は毎日のquick検査。設定したローカル時刻から1時間の開始枠を設け、枠内では他操作・エンジン確認・定義不足・更新制限の解消を待つ。期限を過ぎたらmissedとして保存し、後から埋め合わせない。枠内で開始した検査は完了まで継続する。DSTの重複時刻は最初の時刻を採用し、存在しない時刻はmissedとする。
+
+SQLiteのscheduled_runsはローカル日付と種別を一意キーとする。開始前にscan ID付きclaimをコミットし、時刻・設定の変更、所有権交代、再起動でも同じ日の実行済み予約を再実行しない。起動前の競合や時計変更ならpendingに戻して再判定し、実際に開始した検査は再試行しない。再起動時は保存済みの検査結果と照合し、結果不明のclaimはinterruptedとして残す。検査履歴と予約結果は同一トランザクションで保存する。旧last_scheduled_scanも重複抑止用に移行する。
+
+予定UTC時刻、実行期限、ローカル日付・時刻、タイムゾーンの説明ラベル（現在のUTCオフセット）、設定全体のSHA-256、開始・終了時刻、状態・理由、scan IDを保存する。IANAタイムゾーン名は保存しない。稼働中に観測した日だけを記録し、電源オフ中の全日付を生成しない。設定画面は最新の日付の保存済み予約を3言語で表示し、診断JSONのscheduledRunsには全記録を含める。
+
+定義自動更新は最終開始試行から6時間以上経過し、エンジン確認済み・アイドル・待機期限外の場合に開始する。実行可能な予約検査を優先する。更新の操作確保と開始試行の保存に成功してから子プロセスを起動し、保存失敗なら操作を解放する。workerの既存の所有ジョブとして動作し、終了要求と同じゲートで直列化し、終了時に停止・回収を待つ。実CDNへの自動更新は今回の検証対象外。
+
+English: Daily quick scans now run in either the GUI owner or an already-running worker. Durable daily claims prevent replay across handoff, restart and clock changes. The start window is one hour; missed scans are not caught up. Automatic definitions updates use the shared operation gate and six-hour attempt interval. Login startup is not registered.
+
+简体中文：每日快速扫描现可由 GUI 所有者或已运行的后台进程执行。每日持久化记录可防止切换、重启或时钟变化后的重复执行。仅在预约时间后的一小时内开始，错过后不补扫。病毒定义自动更新共用操作锁，尝试间隔为六小时。尚未注册登录启动服务。

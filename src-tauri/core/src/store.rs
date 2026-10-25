@@ -20,6 +20,7 @@ impl StateNotifier for SilentNotifier {
     fn publish(&self, _snapshot: Snapshot) {}
 }
 pub struct Core {
+    pub maintenance_gate: tokio::sync::Mutex<()>,
     pub document: Mutex<Snapshot>,
     pub db: Mutex<Connection>,
     pub root: PathBuf,
@@ -83,9 +84,13 @@ impl Core {
             }
             save_row(&db, "scans", &scan.id, scan)?;
         }
+        crate::scheduler::initialize(&db)?;
+        let scheduled_run = crate::scheduler::latest(&db)?;
         let diagnostics = crate::diagnostics::load(&db)?;
         Ok(Self {
+            maintenance_gate: tokio::sync::Mutex::new(()),
             document: Mutex::new(Snapshot {
+                scheduled_run,
                 diagnostics,
                 engine: Engine::default(),
                 scan: None,
@@ -134,7 +139,11 @@ impl Core {
         self.publish();
     }
     pub fn save_scan(&self, scan: &Scan) -> Result<()> {
-        save_row(&self.db.lock().unwrap(), "scans", &scan.id, scan)
+        let mut db = self.db.lock().unwrap();
+        let tx = db.transaction().map_err(err)?;
+        save_row(&tx, "scans", &scan.id, scan)?;
+        crate::scheduler::scan_saved(&tx, scan)?;
+        tx.commit().map_err(err)
     }
 }
 pub(crate) fn read_rows<T: serde::de::DeserializeOwned>(

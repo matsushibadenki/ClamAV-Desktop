@@ -23,7 +23,7 @@ pub async fn run(args: Vec<std::ffi::OsString>) -> Result<()> {
                 let _ = engine::inspect(&core).await;
             });
             let result = server
-                .run(async {
+                .run_scheduled(async {
                     let mut term =
                         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
                             .expect("SIGTERM handler");

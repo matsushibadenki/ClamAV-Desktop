@@ -6,12 +6,15 @@ import Diagnostics from "../components/Diagnostics";
 import DownloadCache from "../components/DownloadCache";
 import { useState } from "react";
 import { command, desktop } from "../bridge";
-import { date } from "../i18n";
+import { date, isCopyKey } from "../i18n";
 import type { ViewProps } from "../components/shared";
 export default function Settings(props: ViewProps) {
   const { data, t, run, pending, setup } = props;
   const retryBlocked = useRetryBlock(data.diagnostics);
   const [draft, setDraft] = useState(data.settings);
+  const scheduled = data.scheduledRun;
+  const scheduleStatus = `scheduled_${scheduled?.status ?? "pending"}`;
+  const scheduleReason = `scheduleReason_${scheduled?.reason ?? "unknown"}`;
   const busy = pending || !!data.operation || data.scan?.status === "running";
   return (
     <>
@@ -118,6 +121,17 @@ export default function Settings(props: ViewProps) {
             </select>
           </label>
         </section>
+        {scheduled && (
+          <section className="settings-section" aria-live="polite">
+            <h2>{t("savedSchedule")}</h2>
+            <dl>
+              <div><dt>{scheduled.localDate} · {String(scheduled.localHour).padStart(2, "0")}:00</dt>
+                <dd>{isCopyKey(scheduleStatus) ? t(scheduleStatus) : t("scheduleReason_unknown")}</dd></div>
+            </dl>
+            {scheduled.reason && <p>{isCopyKey(scheduleReason) ? t(scheduleReason) : t("scheduleReason_unknown")}</p>}
+            {scheduled.detail && <details><summary>{t("moreInfo")}</summary><pre>{scheduled.detail}</pre></details>}
+          </section>
+        )}
         <section className="settings-section">
           <h2>{t("downloadPolicy")}</h2>
           <label className="field">

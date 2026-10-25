@@ -12,6 +12,7 @@ mod ownership;
 pub mod process;
 pub mod quarantine;
 pub mod scanner;
+pub mod scheduler;
 pub mod settings;
 pub mod store;
 #[cfg(unix)]

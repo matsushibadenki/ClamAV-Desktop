@@ -43,6 +43,12 @@ pub fn parse(line: &str) -> Parsed<'_> {
     Parsed::Other
 }
 pub async fn start(c: Arc<Core>, kind: String, target: Option<String>) -> Result<String> {
+    start_inner(c, kind, target, uuid::Uuid::new_v4().to_string())
+}
+pub(crate) fn start_scheduled(c: Arc<Core>, id: String) -> Result<String> {
+    start_inner(c, "quick".into(), None, id)
+}
+fn start_inner(c: Arc<Core>, kind: String, target: Option<String>, id: String) -> Result<String> {
     let binary = engine::discover().ok_or("engine_missing")?;
     let home = std::env::var("HOME").map_err(err)?;
     let target = match kind.as_str() {
@@ -63,7 +69,6 @@ pub async fn start(c: Arc<Core>, kind: String, target: Option<String>) -> Result
     if path.starts_with(&c.root) || c.root.starts_with(&path) && kind == "custom" {
         return Err("app_data_target".into());
     }
-    let id = uuid::Uuid::new_v4().to_string();
     let scan = Scan {
         id: id.clone(),
         kind,
@@ -203,6 +208,9 @@ pub async fn start(c: Arc<Core>, kind: String, target: Option<String>) -> Result
             let mut d = c.document.lock().unwrap();
             d.history.insert(0, scan.clone());
             d.scan = Some(scan);
+        }
+        if let Err(reason) = crate::scheduler::publish(&c) {
+            c.log("error", reason);
         }
         c.log("scan_finished", "");
     });

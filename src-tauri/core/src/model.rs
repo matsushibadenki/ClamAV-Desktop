@@ -96,6 +96,8 @@ pub struct Operation {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    #[serde(default)]
+    pub scheduled_run: Option<crate::scheduler::Run>,
     pub engine: Engine,
     pub scan: Option<Scan>,
     pub history: Vec<Scan>,

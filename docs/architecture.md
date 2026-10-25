@@ -1,6 +1,6 @@
 # Architecture
 
-アプリ終了中の予約実行と任意のclamd対応は[背景サービスの実装計画](background-service-plan.md)を参照。共有処理はTauri非依存の`src-tauri/core` crateへ分離済み。通常はGUIプロセス内でCoreを所有する。[手動worker](worker.md)を先に起動した場合、GUIは起動時にIPCプロキシへ接続する。OSサービス登録とアプリ終了中の予約実行は未実装。
+アプリ終了中の予約実行と任意のclamd対応は[背景サービスの実装計画](background-service-plan.md)を参照。共有処理はTauri非依存の`src-tauri/core` crateへ分離済み。通常はGUIプロセス内でCoreを所有する。[手動worker](worker.md)を先に起動した場合、GUIは起動時にIPCプロキシへ接続する。起動済みworkerはGUI終了後も予約検査・定義自動更新を行う。OSサービス登録は未実装。
 
 workerは2スレッドのTokioで動作し、公開TCPポートを使わない。private socketの両側でOSのpeer UIDを確認する。GUIプロキシは最終受信状態の表示キャッシュだけを持ち、DB・取消フラグ・操作を所有しない。毎秒状態を取得し、切断時は3言語で通知して再接続を試みる。worker接続中はGUIのmaintenanceが処理をスキップする。Rust Runtimeの参照管理で起動中の所有権交代を行い、切断だけではCoreを追加生成しない。明示的なGUI復帰にもOSの排他取得を必要とする。未移行のコマンドはworker_operation_unavailableで拒否する。
 
@@ -52,3 +52,5 @@ History/quarantine/diagnostics exports and cache cleanup use the same file-job l
 Manual engine inspection reserves Document.operation, runs outside the IPC mutation mutex, and exposes bounded request-correlated Engine results. GUI and local modes share begin/finish handling. Core Ownership records its acquiring PID and explicitly LOCK_UNs only from that PID after other Core fields are dropped; CLOEXEC is retained. This prevents close-only release from being delayed by fork-inherited descriptors prior to exec without weakening active-owner exclusion.
 
 Live handoff is coordinated by `runtime.rs`. Backend leases and Core strong references prevent teardown while commands, scans, installer, updater or maintenance retain state. The GUI launches its own executable with a fixed `--worker` entry before Tauri initialization, avoiding a separately bundled helper. IPC `shutdown_if_idle` checks work and sets stopping under the mutation gate. The GUI acquires the OS lock before recreating Core; failed or timed-out startup cannot bypass ownership. GUI renderer placement is restored, while transient activity logs restart with the new owner. Production signature/notarization and service registration remain separate verification steps.
+
+予約と定義自動更新は共有コアのschedulerが判定し、GUIとworkerのどちらか一方の所有者が30秒ごとに呼び出す。Coreのmaintenance_gateと設定ゲート、workerのコマンドゲートで開始と終了・設定変更を調整する。日付と種別で一意のscheduled_runsに開始前claimを保存し、検査結果を既存scansと同じSQLiteトランザクションで確定する。Core初期化時は検査履歴を復旧してから予約結果を復旧する。Snapshotは最新予約一件、診断JSONは全予約記録を返す。実行時間枠・時計変更・再実行抑止の契約は[workerの予約実行](worker.md#予約実行2026-10-25)を参照。

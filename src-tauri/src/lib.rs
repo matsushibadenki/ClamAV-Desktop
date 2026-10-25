@@ -293,69 +293,25 @@ fn open_privacy_settings(window: WebviewWindow) -> Result<()> {
         .map_err(err)?;
     Ok(())
 }
-fn runtime_get(c: &Core, key: &str) -> Option<String> {
-    c.db.lock()
-        .unwrap()
-        .query_row("SELECT value FROM runtime_kv WHERE key=?1", [key], |r| {
-            r.get(0)
-        })
-        .ok()
-}
-fn runtime_set(c: &Core, key: &str, value: &str) -> Result<()> {
-    c.db.lock()
-        .unwrap()
-        .execute(
-            "INSERT OR REPLACE INTO runtime_kv(key,value) VALUES (?1,?2)",
-            [key, value],
-        )
-        .map_err(err)?;
-    Ok(())
-}
 async fn maintenance(app: AppHandle) {
     if let Ok(c) = core(&app) {
-        let _ = engine::inspect(&c).await;
+        let _ = engine::refresh(&c).await;
     }
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        // Never retain a Core while sleeping; handoff must be able to drop it.
         let Ok(c) = core(&app) else {
             continue;
         };
-        let snapshot = c.snapshot();
-        if !snapshot.engine.checked {
-            let _ = engine::inspect(&c).await;
-            continue;
+        if !c.snapshot().engine.checked {
+            let _ = engine::refresh(&c).await;
         }
-        if snapshot.operation.is_some()
-            || snapshot
-                .scan
-                .as_ref()
-                .is_some_and(|s| s.status == "running")
+        if let Err(reason) =
+            clamav_desktop_core::scheduler::tick(&c, &clamav_desktop_core::scheduler::SystemClock)
+                .await
         {
-            continue;
-        }
-        let now = chrono::Local::now();
-        if snapshot.settings.auto_update && snapshot.engine.version.is_some() {
-            let due = runtime_get(&c, "last_update_attempt")
-                .and_then(|s| s.parse::<i64>().ok())
-                .is_none_or(|t| now.timestamp() - t >= 6 * 3600);
-            if due && runtime_set(&c, "last_update_attempt", &now.timestamp().to_string()).is_ok() {
-                let _ = engine::update(&c).await;
-                continue;
-            }
-        }
-        use chrono::Timelike;
-        let date = now.format("%Y-%m-%d").to_string();
-        if snapshot.settings.schedule_enabled
-            && now.hour() == snapshot.settings.schedule_hour
-            && runtime_get(&c, "last_scheduled_scan").as_deref() != Some(&date)
-            && snapshot.engine.definitions
-            && snapshot.engine.version.is_some()
-        {
-            // Claim first so a restart never duplicates a scheduled scan in the same hour.
-            if runtime_set(&c, "last_scheduled_scan", &date).is_ok() {
-                if let Err(e) = scanner::start(c.clone(), "quick".into(), None).await {
-                    c.log("error", e);
-                }
+            if reason != "busy" {
+                c.log("error", format!("scheduler: {reason}"));
             }
         }
     }
