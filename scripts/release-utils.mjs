@@ -22,3 +22,16 @@ export function mergeManifests(values) {
   return result;
 }
 export function checksum(bytes) { return createHash('sha256').update(bytes).digest('hex'); }
+// Tauri removes the first path component while unpacking the bundle. A sibling
+// AppleDouble file (._App.app) would become the extraction directory itself.
+export function verifyUpdaterEntries(entries) {
+  const root = 'ClamAV Desktop.app';
+  const paths = entries.map(path => path.replace(/\/$/, ''));
+  if (!paths.length || paths.some(path => {
+    const parts = path.split('/');
+    return parts[0] !== root || parts.some(part => !part || part === '.' || part === '..' || part.startsWith('._'));
+  })) throw new Error('Updater archive must contain one app bundle without AppleDouble metadata.');
+  for (const required of ['Contents/Info.plist', 'Contents/MacOS/clamav-desktop']) {
+    if (!paths.includes(`${root}/${required}`)) throw new Error(`Updater archive missing ${required}`);
+  }
+}

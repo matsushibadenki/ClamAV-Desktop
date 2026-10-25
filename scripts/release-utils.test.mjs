@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { manifest, mergeManifests } from './release-utils.mjs';
+import { manifest, mergeManifests, verifyUpdaterEntries } from './release-utils.mjs';
 test('merges signed per-platform manifests and preserves signatures', () => {
   const a = manifest('0.2.0', 'darwin-aarch64', 'ClamAV-Desktop_0.2.0_aarch64.app.tar.gz', 'sig-a');
   const b = manifest('0.2.0', 'darwin-x86_64', 'ClamAV-Desktop_0.2.0_x86_64.app.tar.gz', 'sig-b');
@@ -9,6 +9,15 @@ test('merges signed per-platform manifests and preserves signatures', () => {
   assert.match(result.platforms['darwin-aarch64'].url, /\/v0.2.0\//);
   assert.throws(() => mergeManifests([a,a]), /Duplicate/);
   assert.throws(() => mergeManifests([a,manifest('0.3.0','darwin-x86_64','other.app.tar.gz','s')]), /versions/);
+});
+test('updater archive excludes root AppleDouble files that Tauri cannot unpack', () => {
+  const valid = ['ClamAV Desktop.app/', 'ClamAV Desktop.app/Contents/Info.plist', 'ClamAV Desktop.app/Contents/MacOS/clamav-desktop'];
+  assert.doesNotThrow(() => verifyUpdaterEntries(valid));
+  for (const entry of ['._ClamAV Desktop.app', 'ClamAV Desktop.app/Contents/._Info.plist', '/ClamAV Desktop.app/file', 'ClamAV Desktop.app/../file', 'Other.app/file']) {
+    assert.throws(() => verifyUpdaterEntries([...valid, entry]), /one app bundle/);
+  }
+  assert.throws(() => verifyUpdaterEntries(valid.slice(0,2)), /missing/);
+  assert.throws(() => verifyUpdaterEntries([]), /one app bundle/);
 });
 test('rejects missing signatures, unexpected hosts, names and platforms', () => {
   assert.throws(() => manifest('0.2.0','darwin-aarch64','../test.app.tar.gz','s'));

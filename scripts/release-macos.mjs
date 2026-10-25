@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
-import { manifest, checksum } from './release-utils.mjs';
+import { manifest, checksum, verifyUpdaterEntries } from './release-utils.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const config = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
 const version = config.version;
@@ -88,7 +88,9 @@ if (signed) {
   run('/usr/bin/xcrun',['stapler','validate',dmg]);
   const name = `ClamAV-Desktop_${version}_${arch}.app.tar.gz`;
   const archive = join(bundle,'macos',name);
-  run('/usr/bin/tar',['-czf',archive,'-C',join(bundle,'macos'),'ClamAV Desktop.app']);
+  run('/usr/bin/tar',['-czf',archive,'-C',join(bundle,'macos'),'ClamAV Desktop.app'],false,{...environment,COPYFILE_DISABLE:'1'});
+  // macOS tar -t hides AppleDouble entries; inspect raw entries with tarfile.
+  verifyUpdaterEntries(JSON.parse(run('python3',['-c','import json,sys,tarfile;\nwith tarfile.open(sys.argv[1]) as archive: print(json.dumps(archive.getnames()))',archive],true)));
   // CLI reads the private key from the environment, never from a printed command argument.
   run('npm',['run','tauri','--','signer','sign','--app-version',version,archive],true);
   const signature = readFileSync(archive+'.sig','utf8').trim();
