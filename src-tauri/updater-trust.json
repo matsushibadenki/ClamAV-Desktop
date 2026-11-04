@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "mode": "legacy",
+  "baselineVersion": "0.3.1",
+  "publicKey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2NzQ1QzU5OTg1OTU4MTgKUldRWVdGbVlXVngwVnJMa3d4eDc1M2Y2YjdzVytzVkxYb2RBeWdabGNaTkJyNUcrMS92WHpKMGoK",
+  "endpoint": "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest.json"
+}

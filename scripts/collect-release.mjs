@@ -1,17 +1,11 @@
-import { mkdirSync, readFileSync, copyFileSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
-import { checksum } from './release-utils.mjs';
-const bundle='src-tauri/target/release/bundle';
-const verify=join(bundle,'verification');
-const info=JSON.parse(readFileSync(join(verify,'release.json'),'utf8'));
-if (info.development || !info.appNotarizationVerified || !info.dmgNotarizationVerified) throw new Error('Release is not verified for distribution.');
-mkdirSync('release-output',{recursive:true});
-for (const entry of info.artifacts) {
-  if (entry.file !== basename(entry.file) || !(/\.dmg$/.test(entry.file) || /\.app\.tar\.gz$/.test(entry.file))) throw new Error('Unexpected release filename.');
-  const source=join(bundle,entry.file.endsWith('.dmg')?'dmg':'macos',entry.file);
-  if (checksum(readFileSync(source))!==entry.sha256) throw new Error('Release checksum mismatch.');
-  copyFileSync(source,join('release-output',entry.file));
-  if (entry.file.endsWith('.app.tar.gz')) copyFileSync(source+'.sig',join('release-output',entry.file+'.sig'));
-}
-for (const file of ['SHA256SUMS','release.json',`latest-${info.architecture==='arm64'?'aarch64':'x86_64'}.json`]) copyFileSync(join(verify,file),join('release-output',file));
-console.log('Only verified public release artifacts were collected.');
+import { readJson, readRegular, verifiedRelease, writeReleaseFiles } from './release-feeds.mjs';
+import { validateUpdaterTrust } from './updater-trust.mjs';
+const config = readJson('src-tauri/tauri.conf.json');
+const policy = readJson('src-tauri/updater-trust.json');
+const trust = validateUpdaterTrust(config, policy);
+if (process.argv.length > 3) throw new Error('Usage: collect-release.mjs [staging-directory]');
+const folder = process.argv[2] || 'release-output';
+const legacyBytes = trust.mode === 'manual' ? readRegular('src-tauri/updater-legacy.json') : undefined;
+const result = verifiedRelease('src-tauri/target/release/bundle/verification', config, policy, { merged: false, bundle: true, legacyBytes });
+writeReleaseFiles(folder, result.files, [...result.files.keys(), trust.feedName]);
+console.log(`Only verified ${trust.mode} release files were collected in ${folder}.`);

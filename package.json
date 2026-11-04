@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "tauri": "tauri",
     "test": "vitest run src",
+    "test:release": "node --test scripts/release-utils.test.mjs scripts/updater-trust.test.mjs scripts/release-feeds.test.mjs scripts/updater-key-material.test.mjs scripts/encrypted-key-backup.test.mjs",
     "dist:mac": "node scripts/release-macos.mjs --development",
     "release:mac": "node scripts/release-macos.mjs --signed"
   },

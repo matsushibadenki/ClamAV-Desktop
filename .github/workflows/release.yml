@@ -22,6 +22,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
       - name: Install frontend dependencies
         run: npm ci
+      - name: Check published-client updater compatibility
+        run: node scripts/check-updater-trust.mjs
       - name: Check updater signing key
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

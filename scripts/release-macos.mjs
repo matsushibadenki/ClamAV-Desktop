@@ -3,6 +3,8 @@ import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync, rmSync
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { manifest, checksum, verifyUpdaterEntries } from './release-utils.mjs';
+import { validateUpdaterTrust } from './updater-trust.mjs';
+import { frozenLegacyFeed, readRegular, trustReceipt } from './release-feeds.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const config = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
 const version = config.version;
@@ -16,6 +18,10 @@ const prepareOnly = args.includes('--prepare-only');
 if (args.some(a => !['--signed','--development','--check','--prepare-only'].includes(a)) || signed === args.includes('--development')) throw new Error('Choose --signed or --development.');
 if (prepareOnly && (!signed || check)) throw new Error('--prepare-only requires --signed without --check.');
 if (process.platform !== 'darwin') throw new Error('macOS is required.');
+// Fail before touching signing credentials, notarization, or build outputs.
+const policy = signed ? JSON.parse(readFileSync(join(root,'src-tauri/updater-trust.json'),'utf8')) : null;
+const trust = signed ? validateUpdaterTrust(config, policy) : null;
+const legacyFeed = trust?.mode === 'manual' ? frozenLegacyFeed(readRegular(join(root,'src-tauri/updater-legacy.json')), policy) : null;
 const environment = { ...process.env, CI: 'true' };
 function run(command, argv, capture = false, env = environment) {
   const result = spawnSync(command, argv, {cwd:root, env, encoding:'utf8', stdio:capture?'pipe':'inherit'});
@@ -25,6 +31,7 @@ function run(command, argv, capture = false, env = environment) {
 const profile = environment.APPLE_KEYCHAIN_PROFILE || 'clamav-desktop';
 const notaryCredentials = ['--keychain-profile', profile, ...(environment.APPLE_NOTARY_KEYCHAIN ? ['--keychain', environment.APPLE_NOTARY_KEYCHAIN] : [])];
 if (signed) {
+  if (trust.mode === 'manual' && !environment.TAURI_SIGNING_PRIVATE_KEY && !environment.TAURI_SIGNING_PRIVATE_KEY_PATH) throw new Error('Manual migration requires an explicit new signing key; the legacy local key is not selected automatically.');
   const identities = run('/usr/bin/security',['find-identity','-v','-p','codesigning'],true);
   const available = [...identities.matchAll(/([A-Fa-f0-9]{40}) "(Developer ID Application: [^"]+)"/g)];
   const requested = environment.APPLE_SIGNING_IDENTITY;
@@ -46,7 +53,7 @@ if (signed) {
 }
 if (check) { console.log(`Preflight passed: ${signed?'signed/keychain-profile':'development'} build.`); process.exit(0); }
 run('npm',['test']);
-run('node',['--test','scripts/release-utils.test.mjs']);
+run('npm',['run','test:release']);
 run('cargo',['test','--manifest-path','src-tauri/Cargo.toml','--workspace','--locked']);
 const signing = {bundle:{createUpdaterArtifacts:false,macOS:{signingIdentity:signed?environment.APPLE_SIGNING_IDENTITY:'-'}}};
 run('npm',['run','tauri','--','build','--bundles',signed?'app':'app,dmg','--config',JSON.stringify(signing)]);
@@ -96,11 +103,12 @@ if (signed) {
   const signature = readFileSync(archive+'.sig','utf8').trim();
   run('cargo',['test','--manifest-path','src-tauri/Cargo.toml','-p','clamav-desktop','app_updater::tests::release_signature_matches_public_key','--locked','--','--ignored'],false,{...environment,CLAMAV_UPDATE_TEST_ARCHIVE:archive});
   updater = {file:name,signature,sha256:checksum(readFileSync(archive))};
-  writeFileSync(join(output,`latest-${arch}.json`),JSON.stringify(manifest(version,`darwin-${arch}`,name,signature),null,2)+'\n');
+  writeFileSync(join(output,`${trust.manifestPrefix}${arch}.json`),JSON.stringify(manifest(version,`darwin-${arch}`,name,signature),null,2)+'\n');
+  if (legacyFeed) writeFileSync(join(output,'latest.json'),legacyFeed);
 }
 run('/usr/bin/codesign',['--verify','--deep','--strict',app]);
 run('/usr/bin/hdiutil',['verify',dmg]);
 const artifacts = [{file:dmgName,sha256:checksum(readFileSync(dmg))},...(updater?[{file:updater.file,sha256:updater.sha256}]:[])];
-writeFileSync(join(output,'release.json'),JSON.stringify({version,architecture:process.arch,development:!signed,appNotarizationVerified:signed,dmgNotarizationVerified:signed,artifacts},null,2)+'\n');
+writeFileSync(join(output,'release.json'),JSON.stringify({version,architecture:process.arch,development:!signed,appNotarizationVerified:signed,dmgNotarizationVerified:signed,updaterTrust:trust ? trustReceipt(trust) : null,artifacts},null,2)+'\n');
 writeFileSync(join(output,'SHA256SUMS'),artifacts.map(a=>`${a.sha256}  ${a.file}`).join('\n')+'\n');
 console.log(`Verified ${signed?'signed/notarized':'development'} artifacts. No GitHub release was published.`);

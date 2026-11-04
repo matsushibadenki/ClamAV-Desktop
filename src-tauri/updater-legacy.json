@@ -1,0 +1,11 @@
+{
+  "version": "0.3.1",
+  "notes": "ClamAV Desktop 0.3.1",
+  "pub_date": "2026-10-25T10:38:49.831Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWVdGbVlXVngwVm80Snp6MzJiMXQ0dSsvcmQzazY2VC84cnE5MkFwK3FUekVvampNSUZFWStxMnA0NzlEcDFlRStMTjVRaks4WFA0dDhSNWpFdTV6aGhNZUVnK2VlSVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTI0NzI5CWZpbGU6Q2xhbUFWLURlc2t0b3BfMC4zLjFfYWFyY2g2NC5hcHAudGFyLmd6CXZlcnNpb246MC4zLjEKMENNb3VZY1g3VFNsTjRjRHNuaFg4YkZsS1A2L280SjRPUDNvZW40MkJjRER4dGFxTXR0aC9EdTAzWU9KY1h0eGprMzlKNDJwU0ljazlJUjBENDZVQmc9PQo=",
+      "url": "https://github.com/matsushibadenki/ClamAV-Desktop/releases/download/v0.3.1/ClamAV-Desktop_0.3.1_aarch64.app.tar.gz"
+    }
+  }
+}

@@ -30,6 +30,25 @@ node scripts/merge-updater.mjs release-output
 
 [Tauri公式アップデーター](https://v2.tauri.app/plugin/updater/)を使用する。公開鍵はtauri.conf.json、秘密鍵はGit対象外の`.secrets/updater.key`に0600、親は0700で保持する。**秘密鍵を安全にバックアップする。紛失すると既存クライアント向けの署名付き更新を作れない。** `TAURI_SIGNING_PRIVATE_KEY`（内容）または`TAURI_SIGNING_PRIVATE_KEY_PATH`（ファイル）、必要に応じて`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`を使う。秘密鍵をIssueやPRへ貼らない。
 
+## 更新鍵・配信先の変更前の確認
+
+[更新署名鍵の移行計画](updater-key-migration.md)に従う。`src-tauri/updater-trust.json`は公開0.3.1の信頼設定を固定した公開情報であり、秘密鍵ではない。
+
+```sh
+node scripts/check-updater-trust.mjs
+npm run test:release
+```
+
+正式ビルドは資格情報・公証処理の前、収集・Draft作成は成果物処理の前に同じチェックを行う。GitHub Actionsもキーチェーン作成前に確認する。公開鍵・更新先URLの変更、追加のフォールバック、署名内バージョン検証の無効化、基準より古い版を拒否する。環境変数やCLIオプションでの無効化は用意しない。
+
+新鍵への切替時は、製品設定だけでなく配信系統・成果物収集・Draft検証も合わせて実装する。現行はschemaVersion=1 / legacyを維持する。二系統配信ツールはschemaVersion=2 / manualにも対応し、K0の基準情報・固定旧フィード・successorのK1と新配信先を別々に検証する。bridgeは未対応。基準ファイルだけを新鍵へ書き換えて配布を通さない。旧鍵が共有された経緯から、K0署名の中継版だけで信頼を回復できると扱わず、署名・公証済みDMGで新鍵を導入する手順を優先する。
+
+収集先は`node scripts/collect-release.mjs release-output/版名`で指定できる。前版を含む混在フォルダを再利用せず、移行版には新しい保存先を使う。`node scripts/draft-release.mjs 保存先 --check`は、`GITHUB_SHA`の形式と、公開対象のファイル一覧・版・署名ファイル・SHA-256・フィード・ビルドの信頼設定を確認し、指定したコミットを表示する。指定コミットがレビュー済みのビルド元であることは実行者が別途確認する。GitHubへのアップロードは行わない。
+
+manualでは`latest-v2.json`と固定された旧`latest.json`の両方を配布する。新しい署名鍵は明示指定し、旧ローカル鍵へのフォールバックは拒否する。ビルド済み成果物の`updaterTrust`記録が現在の設定と一致することを必須にする。生成・収集・Draftの形式と移行手順は[計画書](updater-key-migration.md)を参照。現行の本番設定・公開フィードは切り替えていない。
+
+K1のローカル準備ツールは`node scripts/prepare-updater-key.mjs --help`を参照。現時点では0.4.0向け鍵と設定候補を私有領域に準備済みで、実署名・ローカル復元を確認した。再生成せず`--verify`を使用する。外付け媒体への保存は`--backup 絶対パス`で暗号化イメージを作成し、所有者がローカルでパスフレーズを入力する。独立バックアップの成功記録を確認してから、候補の差分適用とCI Secretの置換へ進む。詳細と公開指紋は[鍵移行計画](updater-key-migration.md)に記録。
+
 ## GitHub Actionsの準備
 
 `.github/workflows/release.yml`はmainブランチからの手動実行のみ。固定コミットのアクションを使い、署名済み成果物を作ってDraft Releaseに追加する。公開操作は含まない。ソースとワークフローをGitHubへ反映してから実行する。2026-10-14の再確認では、リポジトリSecret `CLAMAV_DESKTOP_KEY`の登録を確認。`APPLE_ID`・`APPLE_TEAM_ID`・`APPLE_PASSWORD`もリポジトリSecretsへ登録済み。`TAURI_SIGNING_PRIVATE_KEY`は検証済みローカル鍵との一致を確認して登録済み。`APPLE_CERTIFICATE`・`APPLE_CERTIFICATE_PASSWORD`の登録名も確認済みで、必要な6つのSecretは揃っている。Secretの値・p12の有効性はHosted CIで検証する。Hosted CIは2026-10-14に成功し、v0.2.0のDraft Releaseを作成済み。`CLAMAV_DESKTOP_KEY`は更新署名鍵とは別の認証情報との確認を受けており、用途が確定するまでワークフローでは参照しない。更新署名には別途登録済みの`TAURI_SIGNING_PRIVATE_KEY`を使用する。
