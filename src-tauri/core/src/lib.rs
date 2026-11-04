@@ -7,6 +7,8 @@ pub mod exports;
 pub mod file_transfer;
 #[cfg(unix)]
 pub mod ipc;
+#[cfg(unix)]
+pub mod login_service;
 pub mod model;
 mod ownership;
 pub mod process;

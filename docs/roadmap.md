@@ -58,7 +58,8 @@
 - 🟢 [Done] 保存済み予約の状態・見送り理由を3言語で表示し、予約台帳を診断JSONへ追加。
 - ⭕️ [Pending] 正式配布.appでのworkerのGUI終了後継続・固有権限・workerを停止してからの更新確認。worker入口を含む0.3.1のDeveloper ID署名・公証は完了。
 - 🟢 [Done] 実GUIのworker接続、未対応操作の日本語表示、ログの独立表示・再ドッキング、切断通知、再接続時の通知解除を確認。
-- 🟠 [Next] LaunchAgentの登録・解除、安定したアプリパスの検証と許可状態の表示。起動済みworkerの予約実行は対応済み。
+- 🟢 [Done] LaunchAgentの読取専用事前検証。安定した.appパス・Developer ID署名・専用データ領域・登録ファイルの一致を確認し、plist候補を生成。GUIなしの確認入口を追加。
+- 🟠 [Next] LaunchAgentの登録・解除とGUIの所有権交代への統合、OS許可・稼働状態の表示。事前検証では許可・稼働を未確認として区別する。
 - 🔴 [Later] clamd常駐サービス、ログパネル以外のレイアウト拡張。
 - 🔴 [Later] Endpoint Security Entitlementを取得した場合のリアルタイム検査。
 - ⭕️ [Pending] 未導入のクリーンなMacでの管理者インストール完了、Intel Mac、macOS 12での実機検証。

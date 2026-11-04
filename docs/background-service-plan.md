@@ -1,6 +1,6 @@
 # Background service implementation plan
 
-共有コア・worker・予約実行は実装済み。OSへのログインサービス登録は未実装で、以下は残作業を含む設計・検証計画。
+共有コア・worker・予約実行と、LaunchAgentの読取専用事前検証は実装済み。OSへのログインサービス登録は未実装で、以下は残作業を含む設計・検証計画。
 
 ## 優先順位と構成
 
@@ -31,7 +31,7 @@ Rustの共有ライブラリがDocument、SQLite、検査、定義更新、隔�
 
 ## 3. 予約実行 — 🟢 [Done] / 登録 — 🟠 [Next]
 
-2026-10-25、共有スケジューラー、日付別claim、1時間の開始枠、missed/DST/時計変更、結果の原子的保存と再起動時復旧、定義自動更新を実装。注入時計と実workerの専用フォルダ検査で確認した。タイムゾーンは現在のオフセットを含む説明ラベルで保存し、IANA識別子ではない。保存済み予約の状態・理由は3言語の設定画面と診断JSONへ反映する。LaunchAgent登録・解除は次の実装対象。
+2026-10-25、共有スケジューラー、日付別claim、1時間の開始枠、missed/DST/時計変更、結果の原子的保存と再起動時復旧、定義自動更新を実装。注入時計と実workerの専用フォルダ検査で確認した。タイムゾーンは現在のオフセットを含む説明ラベルで保存し、IANA識別子ではない。保存済み予約の状態・理由は3言語の設定画面と診断JSONへ反映する。LaunchAgentの事前検証は2026-11-04に実装。登録・解除とGUI所有権交代への統合は次の実装対象。
 
 - LaunchAgentはworkerをログイン時に開始し、worker内の時計で既存の予約時刻を判定する。GUIのmaintenanceを同時に動かさない。異常終了時の再起動はlaunchdで抑制し、無限の短周期再起動を避ける。
 - 予約履歴を専用テーブルへ移し、ローカル日付と予約種別を一意キーにする。時刻設定を変更しても同日に再実行しない。予定時刻・タイムゾーン・設定版・開始/終了時刻・状態・失敗理由を保存する。DBトランザクションでclaimし、再起動した実行中ジョブは中断として残す。自動再実行しない。
@@ -76,3 +76,20 @@ workerは.app内のメイン実行ファイルの`--worker`入口を使用する
 English: Start with a shared Rust core and exclusive process ownership, then a per-user worker for scheduled clamscan jobs. Optional clamd support follows. The worker and daily scheduling are implemented; login service registration and signed-release validation remain pending.
 
 简体中文：先分离共享 Rust 核心并实现进程间独占，再添加用户级后台进程和 clamscan 定时扫描，最后添加可选的 clamd。后台进程和每日定时扫描已实现；登录服务注册及正式签名发行版验证仍待完成。
+
+
+## LaunchAgent事前検証（2026-11-04）— 🟢 [Done]
+
+共有コアの`login_service`は、登録前の読み取りだけを行う。アプリ実行ファイルの`--login-service-check`入口はTauri初期化前にJSONを出力する。引数の追加・パス上書きは受け付けず、ホームは`HOME`環境変数ではなくOSのアカウント情報から取得する。
+
+受入先は`/Applications/ClamAV Desktop.app`またはアカウントの`~/Applications/ClamAV Desktop.app`内の固定実行ファイルのみ。各パス要素の所有者・書込み権限・リンクを検証する。標準のroot:admin所有`/Applications`だけは管理者グループの書込みを許容する。Info.plistの識別子・実行ファイル名・APPL種別と、Developer ID Application要件付きcodesign検証も必須。開発target、一時展開、移動先の任意フォルダ、リンク経由の配置は拒否する。これは登録候補の検証であり、特定Team IDの固定やGatekeeper公証判定の代替ではない。
+
+保存先はアカウントの`Library/Application Support/app.clamav.desktop`に固定し、既存の本人所有0700ディレクトリを要求する。登録候補は本人の`Library/LaunchAgents/app.clamav.desktop.worker.plist`のみ。既存登録は本人所有・単一リンク・非公開の通常ファイルを上限16KiBで読み、完全一致／競合／未作成に分ける。不一致や旧パスのファイルは自動で修正・削除しない。事前検証はディレクトリも作成しない。
+
+plistは引数配列で固定worker入口を指定し、XML文字をエスケープする。ログイン時起動、異常終了時のみ再起動、最短60秒間隔、077のumaskを指定する。日付ごとの実行判定は既存のRustスケジューラーに任せる。構成キーは[Appleのlaunchd.plist仕様](https://github.com/apple-oss-distributions/launchd/blob/main/man/launchd.plist.5)を参照した。
+
+`registration=matches`はファイル一致のみを表し、許可済み・launchd登録済み・worker稼働中を意味しない。`permission=unknown`、`loaded=null`を返し、後続のOS状態確認と分離する。登録・解除、起動済みworkerの引継ぎ、終了待機と更新連携、3言語の設定UIは🟠 [Next]。ログイン・再起動・許可拒否の実機確認は⭕️ [Pending]。
+
+English: Read-only LaunchAgent preflight validates the installed bundle, Developer ID signature, private data directory and exact registration bytes, then emits a plist candidate. It does not register a service or infer OS permission/running state. Registration, ownership handoff and settings UI remain next.
+
+简体中文：只读 LaunchAgent 预检现可验证已安装应用、Developer ID 签名、私有数据目录及注册文件内容，并生成 plist 候选。预检不注册服务，也不推断系统许可或运行状态。服务注册、所有权移交和设置界面是下一步。

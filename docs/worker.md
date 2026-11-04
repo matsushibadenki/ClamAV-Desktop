@@ -187,3 +187,18 @@ SQLiteのscheduled_runsはローカル日付と種別を一意キーとする。
 English: Daily quick scans now run in either the GUI owner or an already-running worker. Durable daily claims prevent replay across handoff, restart and clock changes. The start window is one hour; missed scans are not caught up. Automatic definitions updates use the shared operation gate and six-hour attempt interval. Login startup is not registered.
 
 简体中文：每日快速扫描现可由 GUI 所有者或已运行的后台进程执行。每日持久化记录可防止切换、重启或时钟变化后的重复执行。仅在预约时间后的一小时内开始，错过后不补扫。病毒定义自动更新共用操作锁，尝试间隔为六小时。尚未注册登录启动服务。
+
+
+## ログイン登録の事前確認（2026-11-04）
+
+新しいビルドを安定したApplications配下へ配置した後、以下でGUIを開かずに登録候補を確認できる。
+
+```sh
+'/Applications/ClamAV Desktop.app/Contents/MacOS/clamav-desktop' --login-service-check
+```
+
+この入口は新規実装のため、公開済み0.3.1には含まれない。本人のApplicationsへ導入した場合はその絶対パスを使う。開発用バイナリや署名条件を満たさない.appは拒否される。出力の`plist`は登録候補であり、OSへの登録・起動・停止・設定変更は行わない。`registration`は`absent`／`matches`／`conflict`、`permission`は`unknown`、`loaded`は`null`。ホーム／データパス等を含むので、診断共有時は個人情報を確認する。[検証条件と残作業](background-service-plan.md#launchagent事前検証2026-11-04--done)。
+
+English: The new `--login-service-check` entry emits a read-only registration plan from an installed, Developer ID signed app; it is not available in the published 0.3.1. It does not enable login startup. Permission and running state remain unknown.
+
+简体中文：新增的 `--login-service-check` 入口从已安装且具有 Developer ID 签名的应用输出只读注册计划；已发布的 0.3.1 不包含此入口。它不会启用登录启动，许可和运行状态仍为未知。

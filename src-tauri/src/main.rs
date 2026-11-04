@@ -16,5 +16,24 @@ fn main() {
         }
         return;
     }
+    #[cfg(target_os = "macos")]
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--login-service-check"))
+    {
+        if std::env::args_os().len() != 2 {
+            eprintln!("Usage: clamav-desktop --login-service-check");
+            std::process::exit(1);
+        }
+        match clamav_desktop_core::login_service::current_user_preflight() {
+            Ok(plan) => println!(
+                "{}",
+                serde_json::to_string_pretty(&plan).expect("serializable service plan")
+            ),
+            Err(reason) => {
+                eprintln!("{reason}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     clamav_desktop_lib::run();
 }
