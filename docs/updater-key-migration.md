@@ -1,6 +1,6 @@
 # 更新署名鍵の移行計画
 
-2026-11-05更新。現段階は **🟢 [Done] 二系統配信ツール・新鍵のローカル生成と実署名検証**、**🟢 [Done] 外付け暗号化バックアップ・0.3.2への組込み・CI署名鍵更新**、**🟠 [Next] 署名・公証・公開**。製品はK1とlatest-v2.jsonへ切替済み。公開リリースは成果物検証後に更新する。
+2026-11-05更新。現段階は **🟢 [Done] 二系統配信ツール・新鍵のローカル生成と実署名検証**、**🟢 [Done] 外付け暗号化バックアップ・0.3.2への組込み・CI署名鍵更新**、**🟢 [Done] 0.3.2の署名・公証・公開**。製品はK1とlatest-v2.jsonへ切替済み。旧latest.jsonは0.3.1を保持する。
 
 ## 判断と対象
 
@@ -156,3 +156,6 @@ npm run updater:backup -- '/absolute/path/on/another-volume'
 0.3.2のtauri.conf.jsonとtrust policyをmanualへ切替え、successor.firstVersion=0.3.2、配信先latest-v2.json、K1公開鍵を同期した。既存GitHubリポジトリSecret TAURI_SIGNING_PRIVATE_KEYも同じK1へ更新し、Environment releaseに旧鍵の上書きがないことを名前一覧だけで確認した。旧クライアントのlatest.jsonは固定済み0.3.1を保持する。初回DMG移行はREADMEと公開説明に英語・日本語・简体中文で記載する。
 
 入力失敗時は固定の理由（短すぎる／不一致／ASCII以外／キャンセル）だけを表示する。入力値は出力せず、不正文字も改行まで非表示で消費してからエラーにする。私有鍵・パスフレーズ・バックアップイメージはGitHub成果物に含めない。
+
+
+0.3.2は2026-11-05に公開済み。公開成果物7件を匿名取得してハッシュを照合し、新鍵でのアーカイブ署名・版照合とDMGの公証ticketを確認した。旧鍵は実アーカイブの検証に失敗することも確認した。旧latest.jsonの固定バイト列は維持する。[公開リリース](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.2)。

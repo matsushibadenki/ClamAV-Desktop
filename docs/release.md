@@ -121,3 +121,6 @@ node scripts/merge-updater.mjs release-output/0.3.2
 ```
 
 初回の0.3.2はDMGから手動移行し、以後は新鍵・latest-v2.jsonを使う。latest.jsonの固定バイト列と0.3.1の旧署名を保持する。0.3.2アーカイブをK0向けフィードへ混ぜない。これまでのlegacy設定の説明は旧版の経緯であり、新規公開時はmanualを必須とする。
+
+
+0.3.2は[公開済み](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.2)。Developer ID署名済みアプリとアプリ／DMGの公証ticket、全7公開ファイルの匿名取得・ハッシュ、新旧フィードと新鍵署名を確認した。実行記録・SHA-256・公証IDは[検証記録](verification.md#2026-11-05--k1-migration-and-public-v032)を参照。初回は旧アプリを終了してDMGから導入する。署名された新アプリから次のK1版への実更新は、次版準備後に別途確認する。
