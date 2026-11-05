@@ -70,3 +70,28 @@ test('a detach failure preserves the private workspace instead of recursing into
  assert.throws(()=>encryptedKeyBackup({...f,command,prove:()=>{}}),/detach refused/);
  assert(readdirSync(f.directory).some(n=>n.startsWith('.encrypted-backup-')));
 });
+
+test('hidden input reports fixed reasons without echoing passphrases and restores terminal mode', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { readBackupPassword } = await import('./encrypted-key-backup.mjs');
+  async function enter(first, second) {
+    const input = new EventEmitter(); input.isTTY = true;
+    const modes = []; let output = '';
+    input.setRawMode = value => modes.push(value);
+    input.pause = () => {}; input.resume = () => {};
+    let prompts = 0;
+    const target = { write: text => { output += text; if (text.includes('hidden):') || text.includes('Confirm')) {
+      const value = prompts++ === 0 ? first : second;
+      queueMicrotask(() => input.emit('data', Buffer.from(value + '\n')));
+    } } };
+    const result = await readBackupPassword(input, target).then(value => { value.fill(0); return 'ok'; }, error => error.code);
+    assert.equal(modes.at(-1), false);
+    assert.equal(input.listenerCount('data'), 0);
+    assert(!output.includes(first));
+    return result;
+  }
+  assert.equal(await enter('short', ''), 'too-short');
+  assert.equal(await enter('fixture-password-one', 'fixture-password-two'), 'mismatch');
+  assert.equal(await enter('日本語パスワード', ''), 'ascii-required');
+  assert.equal(await enter('fixture-long-enough-password', 'fixture-long-enough-password'), 'ok');
+});

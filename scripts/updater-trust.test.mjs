@@ -8,11 +8,17 @@ import { join } from 'node:path';
 import { publicKeyFingerprint, validateUpdaterTrust } from './updater-trust.mjs';
 
 const read = file => JSON.parse(readFileSync(new URL(`../src-tauri/${file}`, import.meta.url), 'utf8'));
-const config = read('tauri.conf.json');
-const policy = read('updater-trust.json');
+const activeConfig = read('tauri.conf.json');
+const activePolicy = read('updater-trust.json');
+// Keep frozen-client regressions independent from the active migration mode.
+const policy = { schemaVersion: 1, mode: 'legacy', baselineVersion: activePolicy.baselineVersion, publicKey: activePolicy.publicKey, endpoint: activePolicy.endpoint };
+const config = structuredClone(activeConfig);
+config.plugins.updater.pubkey = policy.publicKey;
+config.plugins.updater.endpoints = [policy.endpoint];
 const copy = value => structuredClone(value);
 
-test('the current release and later stable versions retain published-client trust', () => {
+test('active trust validates and frozen clients retain their legacy trust', () => {
+  assert.doesNotThrow(() => validateUpdaterTrust(activeConfig, activePolicy));
   assert.equal(validateUpdaterTrust(config, policy).baselineVersion, '0.3.1');
   const later = copy(config);
   later.version = '0.10.0';

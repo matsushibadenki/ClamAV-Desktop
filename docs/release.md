@@ -26,7 +26,7 @@ node scripts/merge-updater.mjs release-output
 
 検査・転送・その他操作中のインストールは拒否する。更新インストール中は操作と終了を抑止し、完了後は再起動まで変更操作を拒否する。worker接続中のインストールは未対応で、worker停止後のアプリ再起動が必要。確認だけならworker接続中も可能。
 
-配信URLは`https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest.json`。最初の公開リリースまでは更新情報を取得できない案内になる。0.1.0にはアップデーターがないため、最初の0.2.0はDMGから導入する。0.2.0以降のクライアントに向けて、より新しい署名済みリリースを公開する。
+0.3.2以降の配信URLは`https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest-v2.json`。旧latest.jsonは0.3.1を保持する。0.3.1以前からは署名・公証済みDMGを一度手動導入する。最初の公開リリースまでは更新情報を取得できない案内になる。0.1.0にはアップデーターがないため、最初の0.2.0はDMGから導入する。0.2.0以降のクライアントに向けて、より新しい署名済みリリースを公開する。
 
 [Tauri公式アップデーター](https://v2.tauri.app/plugin/updater/)を使用する。公開鍵はtauri.conf.json、秘密鍵はGit対象外の`.secrets/updater.key`に0600、親は0700で保持する。**秘密鍵を安全にバックアップする。紛失すると既存クライアント向けの署名付き更新を作れない。** `TAURI_SIGNING_PRIVATE_KEY`（内容）または`TAURI_SIGNING_PRIVATE_KEY_PATH`（ファイル）、必要に応じて`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`を使う。秘密鍵をIssueやPRへ貼らない。
 
@@ -41,11 +41,11 @@ npm run test:release
 
 正式ビルドは資格情報・公証処理の前、収集・Draft作成は成果物処理の前に同じチェックを行う。GitHub Actionsもキーチェーン作成前に確認する。公開鍵・更新先URLの変更、追加のフォールバック、署名内バージョン検証の無効化、基準より古い版を拒否する。環境変数やCLIオプションでの無効化は用意しない。
 
-新鍵への切替時は、製品設定だけでなく配信系統・成果物収集・Draft検証も合わせて実装する。現行はschemaVersion=1 / legacyを維持する。二系統配信ツールはschemaVersion=2 / manualにも対応し、K0の基準情報・固定旧フィード・successorのK1と新配信先を別々に検証する。bridgeは未対応。基準ファイルだけを新鍵へ書き換えて配布を通さない。旧鍵が共有された経緯から、K0署名の中継版だけで信頼を回復できると扱わず、署名・公証済みDMGで新鍵を導入する手順を優先する。
+新鍵への切替時は、製品設定だけでなく配信系統・成果物収集・Draft検証も合わせて実装する。0.3.2からschemaVersion=2 / manualを採用する。二系統配信ツールはschemaVersion=2 / manualにも対応し、K0の基準情報・固定旧フィード・successorのK1と新配信先を別々に検証する。bridgeは未対応。基準ファイルだけを新鍵へ書き換えて配布を通さない。旧鍵が共有された経緯から、K0署名の中継版だけで信頼を回復できると扱わず、署名・公証済みDMGで新鍵を導入する手順を優先する。
 
 収集先は`node scripts/collect-release.mjs release-output/版名`で指定できる。前版を含む混在フォルダを再利用せず、移行版には新しい保存先を使う。`node scripts/draft-release.mjs 保存先 --check`は、`GITHUB_SHA`の形式と、公開対象のファイル一覧・版・署名ファイル・SHA-256・フィード・ビルドの信頼設定を確認し、指定したコミットを表示する。指定コミットがレビュー済みのビルド元であることは実行者が別途確認する。GitHubへのアップロードは行わない。
 
-manualでは`latest-v2.json`と固定された旧`latest.json`の両方を配布する。新しい署名鍵は明示指定し、旧ローカル鍵へのフォールバックは拒否する。ビルド済み成果物の`updaterTrust`記録が現在の設定と一致することを必須にする。生成・収集・Draftの形式と移行手順は[計画書](updater-key-migration.md)を参照。現行の本番設定・公開フィードは切り替えていない。
+manualでは`latest-v2.json`と固定された旧`latest.json`の両方を配布する。新しい署名鍵は明示指定し、旧ローカル鍵へのフォールバックは拒否する。ビルド済み成果物の`updaterTrust`記録が現在の設定と一致することを必須にする。生成・収集・Draftの形式と移行手順は[計画書](updater-key-migration.md)を参照。製品設定とCI署名鍵はK1へ切替済み。旧公開フィードは0.3.1で固定し、新フィードを0.3.2の公開時に追加する。
 
 K1のローカル準備ツールは`node scripts/prepare-updater-key.mjs --help`を参照。現時点では0.4.0向け鍵と設定候補を私有領域に準備済みで、実署名・ローカル復元を確認した。再生成せず`--verify`を使用する。外付け媒体への保存は`--backup 絶対パス`で暗号化イメージを作成し、所有者がローカルでパスフレーズを入力する。独立バックアップの成功記録を確認してから、候補の差分適用とCI Secretの置換へ進む。詳細と公開指紋は[鍵移行計画](updater-key-migration.md)に記録。
 
@@ -108,3 +108,16 @@ English: Software updates use signed GitHub archives with mandatory signed-versi
 [公開0.3.1](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.1)は署名・公証・更新署名・改変拒否・実展開後の署名を確認済み。修正した検証用クライアント（表示版0.2.0、実際の配信URLと署名検証を使用）から公開アーカイブを取得し、置換・アプリ自身の再起動・0.3.1での更新確認まで成功した。UI再接続前にPID交代を観測し、テストツールによる再起動ではないことを確認した。元の公開0.2.0からの成功を意味しない。
 
 既存の設定値・検査履歴・隔離記録・未完了転送を保持。旧設定に欠けていた保持期間30日・容量上限1024MiBは既存の互換既定値として保存された。検証は一時フォルダのアプリコピーで行い、`/Applications`のアプリは置き換えていない。詳しい証跡は[検証記録](verification.md)を参照。
+
+
+## 0.3.2の新鍵での正式ビルド
+
+K1の独立バックアップを確認済み。ローカルでは新鍵をファイルパスで明示し、旧鍵へフォールバックしない。
+
+```sh
+TAURI_SIGNING_PRIVATE_KEY_PATH="$PWD/.secrets/updater-v2/updater.key" CARGO_BUILD_JOBS=2 npm run release:mac
+node scripts/collect-release.mjs release-output/0.3.2
+node scripts/merge-updater.mjs release-output/0.3.2
+```
+
+初回の0.3.2はDMGから手動移行し、以後は新鍵・latest-v2.jsonを使う。latest.jsonの固定バイト列と0.3.1の旧署名を保持する。0.3.2アーカイブをK0向けフィードへ混ぜない。これまでのlegacy設定の説明は旧版の経緯であり、新規公開時はmanualを必須とする。

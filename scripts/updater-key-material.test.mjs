@@ -8,7 +8,9 @@ import {prepareKey,verifyPreparedKey,backupPreparedKey} from './updater-key-mate
 import {spawnSync} from 'node:child_process';
 import {copyFileSync} from 'node:fs';
 const read=file=>JSON.parse(readFileSync(new URL(`../src-tauri/${file}`,import.meta.url)));
-const config=read('tauri.conf.json'),policy=read('updater-trust.json');
+const config=read('tauri.conf.json'),activePolicy=read('updater-trust.json');
+const policy={schemaVersion:1,mode:'legacy',baselineVersion:activePolicy.baselineVersion,publicKey:activePolicy.publicKey,endpoint:activePolicy.endpoint};
+config.plugins.updater.pubkey=policy.publicKey;config.plugins.updater.endpoints=[policy.endpoint];
 const legacyFeed=readFileSync(new URL('../src-tauri/updater-legacy.json',import.meta.url));
 function fixture(t){
  const root=mkdtempSync(join(tmpdir(),'clamav-key-material-'));

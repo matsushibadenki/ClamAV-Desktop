@@ -53,34 +53,42 @@ export function encryptedKeyBackup({ directory, destination, receipt, prove, leg
   }
 }
 
-export async function readBackupPassword() {
-  if (!process.stdin.isTTY) throw new Error('Backup passphrase must be entered locally in a terminal.');
+export class BackupPasswordError extends Error {
+  constructor(code) { super(`Backup password input: ${code}`); this.code = code; }
+}
+export async function readBackupPassword(input = process.stdin, output = process.stdout) {
+  if (!input.isTTY) throw new BackupPasswordError('terminal-required');
   async function hidden(prompt) {
-    process.stdout.write(prompt);
-    process.stdin.setRawMode(true); process.stdin.resume();
+    output.write(prompt);
+    input.setRawMode(true); input.resume();
     return await new Promise((resolve, reject) => {
       const bytes = [];
+      let invalid;
       const finish = (error) => {
-        process.stdin.off('data', data); process.stdin.setRawMode(false); process.stdin.pause(); process.stdout.write('\n');
+        input.off('data', data); input.setRawMode(false); input.pause(); output.write('\n');
         if (error) { bytes.fill(0); reject(error); } else { const value = Buffer.from(bytes); bytes.fill(0); resolve(value); }
       };
-      const data = input => {
-        for (const byte of input) {
-          if (byte === 3 || byte === 4) { finish(new Error('Local input cancelled.')); return; }
-          if (byte === 10 || byte === 13) { finish(); return; }
-          if (byte === 21) { bytes.fill(0); bytes.length = 0; }
+      const data = chunk => {
+        for (const byte of chunk) {
+          if (byte === 3 || byte === 4) { finish(new BackupPasswordError('cancelled')); return; }
+          if (byte === 10 || byte === 13) { finish(invalid ? new BackupPasswordError(invalid) : undefined); return; }
+          if (byte === 21) { bytes.fill(0); bytes.length = 0; invalid = undefined; }
           else if (byte === 127 || byte === 8) bytes.pop();
-          else if (byte >= 32 && byte <= 126 && bytes.length < 1024) bytes.push(byte);
+          else if (byte >= 32 && byte <= 126) {
+            if (bytes.length >= 1024) invalid = 'too-long';
+            else bytes.push(byte);
+          } else { invalid = 'ascii-required'; }
         }
       };
-      process.stdin.on('data', data);
+      input.on('data', data);
     });
   }
   const first = await hidden('Backup passphrase (16+ ASCII characters; input hidden): ');
   let second;
   try {
+    if (first.length < 16) throw new BackupPasswordError('too-short');
     second = await hidden('Confirm passphrase: ');
-    if (first.length < 16 || first.length !== second.length || !timingSafeEqual(first, second)) throw new Error('Passphrases did not match.');
+    if (first.length !== second.length || !timingSafeEqual(first, second)) throw new BackupPasswordError('mismatch');
     return first;
   } catch (error) { first.fill(0); throw error; }
   finally { second?.fill(0); }

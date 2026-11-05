@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdtempSync, chmodSync, rmSync } from 'nod
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareKey, verifyPreparedKey, backupPreparedKey, validateBackupDestination } from './updater-key-material.mjs';
-import { encryptedKeyBackup, readBackupPassword } from './encrypted-key-backup.mjs';
+import { encryptedKeyBackup, readBackupPassword, BackupPasswordError } from './encrypted-key-backup.mjs';
 import { readJson, readRegular } from './release-feeds.mjs';
 import { validateUpdaterTrust } from './updater-trust.mjs';
 
@@ -83,9 +83,20 @@ try {
   } }) : verifyPreparedKey({ secretRoot, policy, legacyFeed, prove });
   }
   console.log(JSON.stringify({ schemaVersion: receipt.schemaVersion, version: receipt.version, fingerprint: receipt.fingerprint, localRestoreVerified: receipt.localRestoreVerified, independentBackup: receipt.independentBackup, externalRestoreVerified: receipt.externalRestoreVerified ?? false, lastBackupVerifiedAt: receipt.lastBackupVerifiedAt ?? null, privateDirectory: '.secrets/updater-v2', activeConfigurationUsesPreparedKey: activeTrust.fingerprint === receipt.fingerprint }, null, 2));
-} catch {
+} catch (error) {
   // Even a third-party tool error may contain secret output. Emit fixed text only.
   console.error(`Key preparation/verification failed [${stage}]. Private output was suppressed. Existing keys are never overwritten; use --verify for previously prepared material.`);
+  if (stage === 'password-input' && error instanceof BackupPasswordError) {
+    const messages = {
+      'too-short': 'Use at least 16 ASCII characters. / 半角英数字・記号で16文字以上入力してください。',
+      'mismatch': 'The two entries did not match. / 2回の入力が一致しません。',
+      'ascii-required': 'Use ASCII characters only; Japanese/full-width input is not supported. / 日本語・全角文字は使えません。半角英数字・記号を使ってください。',
+      'too-long': 'Use at most 1024 ASCII characters. / 1024文字以内で入力してください。',
+      'cancelled': 'Input was cancelled. / 入力をキャンセルしました。',
+      'terminal-required': 'Run this command in a local terminal. / ローカルのターミナルで実行してください。',
+    };
+    if (Object.hasOwn(messages, error.code)) console.error(`[${error.code}] ${messages[error.code]}`);
+  }
   if (stage === 'backup-destination') console.error('Connect the external volume and check that the backup directory exists on a different filesystem, is owned by this account, and is not a link. No password was requested and no backup was written.');
   process.exit(1);
 }

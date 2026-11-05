@@ -10,7 +10,10 @@ import { validateUpdaterTrust, modernEndpoint } from './updater-trust.mjs';
 import { createFeeds, verifiedRelease, trustReceipt } from './release-feeds.mjs';
 
 const sourceConfig = JSON.parse(readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url)));
-const sourcePolicy = JSON.parse(readFileSync(new URL('../src-tauri/updater-trust.json', import.meta.url)));
+const activePolicy = JSON.parse(readFileSync(new URL('../src-tauri/updater-trust.json', import.meta.url)));
+const sourcePolicy = { schemaVersion: 1, mode: 'legacy', baselineVersion: activePolicy.baselineVersion, publicKey: activePolicy.publicKey, endpoint: activePolicy.endpoint };
+sourceConfig.plugins.updater.pubkey = sourcePolicy.publicKey;
+sourceConfig.plugins.updater.endpoints = [sourcePolicy.endpoint];
 const legacy = readFileSync(new URL('../src-tauri/updater-legacy.json', import.meta.url));
 const json = value => Buffer.from(JSON.stringify(value, null, 2) + '\n');
 function migration() {

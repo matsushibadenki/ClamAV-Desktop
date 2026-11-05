@@ -1,7 +1,13 @@
 {
-  "schemaVersion": 1,
-  "mode": "legacy",
+  "schemaVersion": 2,
+  "mode": "manual",
   "baselineVersion": "0.3.1",
   "publicKey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2NzQ1QzU5OTg1OTU4MTgKUldRWVdGbVlXVngwVnJMa3d4eDc1M2Y2YjdzVytzVkxYb2RBeWdabGNaTkJyNUcrMS92WHpKMGoK",
-  "endpoint": "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest.json"
+  "endpoint": "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest.json",
+  "legacyFeedSha256": "9ca21cf6aa0d1c71a8114276ff01b3014a82da76da1e54ce374fee88b9442e40",
+  "successor": {
+    "publicKey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwNDczRDNBQzQ2MkQ0NzYKUldSMjFHTEVPajFIY0dPY2R2UXpXa21XVjExK2g5TExmRytKWTRCMFhRREJ2b3kwMlpxQ3paOSsK",
+    "endpoint": "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest-v2.json",
+    "firstVersion": "0.3.2"
+  }
 }

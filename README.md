@@ -4,9 +4,17 @@
 
 macOS用のClamAVフロントエンド。Tauri 2とRustで処理・状態を管理し、ReactのWebViewで操作します。表示言語は日本語、English、简体中文です。
 
+## 0.3.2の更新鍵移行
+
+0.3.1以前からは、[GitHub Releases](https://github.com/matsushibadenki/ClamAV-Desktop/releases)の署名・公証済みDMGを一度手動導入してください。新しい更新署名鍵と配信先を組み込むため、旧アプリ内の更新確認だけでは0.3.2へ移行しません。アプリを終了してから置き換えてください。既存の設定・履歴・隔離データの保存先は維持します。配布物はApple Silicon向けです。
+
+English: From 0.3.1 or earlier, quit the app and install the signed/notarized DMG once. This establishes the new update key/feed; older in-app update checks remain frozen at 0.3.1. Settings, history and quarantine data remain in the same location. Apple Silicon build; Intel validation is pending.
+
+简体中文：从 0.3.1 及更早版本升级时，请退出应用并手动安装一次已签名和公证的 DMG，以建立新的更新密钥及订阅地址。旧应用内的更新检查停留在 0.3.1。设置、历史和隔离数据仍保留在原位置。发行版适用于 Apple Silicon，Intel 验证仍待完成。
+
 ## 起動
 
-必要環境：macOS 12以降、Xcode Command Line Tools、Node.js 20.19以降または22.12以降、Rust 1.88以降。
+必要環境：macOS 12以降、Xcode Command Line Tools、Node.js 20.19以降または22.12以降、Rust 1.90以降。
 
 ```sh
 npm ci
@@ -29,7 +37,7 @@ npm run tauri -- build --debug --bundles app
 4. 検出結果を確認して手動で隔離します。ファイルのハッシュ確認と移動後の再検査を行い、復元時は既存ファイルを上書きしません。同一ボリュームでは原子的に移動します。別ボリュームでは専用一時領域に元ファイルを保持し、コピーの同期・ハッシュ照合・再検査後に隔離を確定します。転送先の空き容量と1MiBの余裕を確認し、コピー・同期・再検査が終わるまで元ファイルを移動しません。exFATの隔離先は保護されたアプリ領域で、exFATへの復元は元の権限制御を再現できません。exFAT上の短時間の元ファイル待避領域は非公開の隔離領域ではなく、中断時には復旧が必要です。中断した未確定転送は再起動時に巻き戻します。ボリュームが未接続、または復元先が競合する場合は両方のデータを残し、隔離画面から復旧を再試行できます。
 5. 履歴はSQLiteに保存し、JSONでエクスポートできます。操作ログは左右にドッキングするか、独立したウインドウにできます。
 
-アプリ起動中のみ予約検査と6時間ごとの定義更新を実行します。アプリ終了中に常駐するサービスやリアルタイム遮断はありません。アクセス不能・サイズ制限は検査未完了として表示します。XProtectとGatekeeperを引き続き利用してください。
+GUIまたはworkerの起動中に予約検査と6時間ごとの定義更新を実行します。0.3.2では設定からログイン起動を登録し、GUI終了後もworkerで継続できます。許可待ちはログイン項目で承認し、アプリへ戻って「再接続・再起動」を選びます。リアルタイム遮断はありません。アクセス不能・サイズ制限は検査未完了として表示します。XProtectとGatekeeperを引き続き利用してください。
 
 ## 検証
 

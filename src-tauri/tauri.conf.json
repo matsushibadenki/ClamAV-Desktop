@@ -45,9 +45,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2NzQ1QzU5OTg1OTU4MTgKUldRWVdGbVlXVngwVnJMa3d4eDc1M2Y2YjdzVytzVkxYb2RBeWdabGNaTkJyNUcrMS92WHpKMGoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwNDczRDNBQzQ2MkQ0NzYKUldSMjFHTEVPajFIY0dPY2R2UXpXa21XVjExK2g5TExmRytKWTRCMFhRREJ2b3kwMlpxQ3paOSsK",
       "endpoints": [
-        "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest.json"
+        "https://github.com/matsushibadenki/ClamAV-Desktop/releases/latest/download/latest-v2.json"
       ],
       "requireSignedVersion": true
     }
