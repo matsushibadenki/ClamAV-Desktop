@@ -20,7 +20,8 @@
 - 🟢 [Done] 署名判定・ネイティブフォーカス復帰を修正した0.3.3を公証・公開。公開0.3.2からの実更新・再起動も確認。
 - 🟢 [Done] worker入口を含む正式0.3.2の署名・公証。署名済み0.3.3候補でLaunchAgentの登録・解除・許可変更後の復旧を実機確認。
 - 🟢 [Done] 公開0.3.3で稼働中workerを伴うApplications間の往復移動・GUI修復と旧コピーが残る場合の拒否を実機確認。
-- 🟠 [Next] 未読み込み時の修復・解除の終了コード処理を修正済み。次版での署名・公証済みGUI検証と配布。
+- 🟢 [Done] 未読み込み時の修復・解除を0.3.4へ収録し、公証済みGUIで実機検証・GitHub公開。公開0.3.3からの実更新・再起動も成功。
+- 🟠 [Next] ログイン後の自動起動・予約実行を実機確認。
 - ⭕️ [Pending] worker固有のアクセス権限の検証。
 - ⭕️ [Pending] helper固有のFull Disk Access、別ユーザーからの実接続拒否、ログイン・スリープ・macOS 12 / Intelでの確認。
 
@@ -279,3 +280,12 @@ English: 0.3.2 adds a focus-refresh and an explicit reconnect/restart action. He
 English: Public 0.3.3 passed GUI registration repair after actual moves in both directions between `/Applications` and `~/Applications` with a running worker. An existing old app prevents repair without changing the registration or PID. An unloaded service exposes a `bootout` exit-code-3 bug. The Rust fix passed live OS tests but is not included in public 0.3.3. Restore the original app location and use reconnect/restart once the registration matches; retain the application data.
 
 简体中文：公开版 0.3.3 已通过运行中后台进程随应用在 `/Applications` 与 `~/Applications` 之间双向移动后的 GUI 注册修复验证。旧应用仍存在时会拒绝修复，并保持原注册和 PID。未加载服务会触发 `bootout` 退出码 3 处理错误。Rust 修复已通过实机系统测试，但尚未包含在公开版 0.3.3 中。可恢复应用原位置，在注册匹配后使用重新连接／重启；请保留应用数据。
+
+
+### 0.3.4での解消
+
+日本語：上記の未読み込み時の不具合は、署名・公証済み0.3.4のGUIで登録修復・解除ともに実機検証済み。GitHub公開後、元の公開0.3.3からのアプリ内更新・自身による再起動も成功した。データは全件保持し、ログイン登録は未登録へ戻した。
+
+English: The unloaded-service issue above is fixed in signed/notarized 0.3.4. Live GUI repair and removal both passed. After GitHub publication, an unmodified public 0.3.3 updated and restarted itself successfully. All saved data was preserved; login registration was removed after testing.
+
+简体中文：上述未加载服务的问题已在签名、公证版 0.3.4 中修复，GUI 注册修复及注销均通过实机验证。GitHub 发布后，未修改的公开版 0.3.3 已成功通过应用内更新并自行重启。全部数据保留，验证后已注销登录服务。
