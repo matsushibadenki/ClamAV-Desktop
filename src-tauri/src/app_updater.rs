@@ -75,7 +75,9 @@ fn classify(reason: &str) -> &'static str {
     } else if s.contains("signature") || s.contains("minisign") || s.contains("signed for version")
     {
         "signature"
-    } else if s.contains("worker_operation_unavailable") {
+    } else if s.contains("worker_operation_unavailable")
+        || s.contains("login_service_disable_required")
+    {
         "worker"
     } else if s.contains("valid release json") {
         "feed"
@@ -165,6 +167,13 @@ pub async fn check(app: AppHandle) -> Result<Status> {
 }
 pub async fn install(app: AppHandle) -> Result<Status> {
     let s = app.state::<Service>();
+    if app
+        .state::<crate::runtime::Runtime>()
+        .login_registration_present()
+    {
+        s.fail(&app, "login_service_disable_required");
+        return Ok(s.snapshot());
+    }
     let _gate = s.gate.try_lock().map_err(|_| "busy")?;
     if s.snapshot().phase != "available" {
         return Err("app_update_not_ready".into());

@@ -202,3 +202,67 @@ English: Daily quick scans now run in either the GUI owner or an already-running
 English: The new `--login-service-check` entry emits a read-only registration plan from an installed, Developer ID signed app; it is not available in the published 0.3.1. It does not enable login startup. Permission and running state remain unknown.
 
 简体中文：新增的 `--login-service-check` 入口从已安装且具有 Developer ID 签名的应用输出只读注册计划；已发布的 0.3.1 不包含此入口。它不会启用登录启动，许可和运行状态仍为未知。
+
+
+## 明示的なログイン登録・解除（2026-11-04）
+
+新しい署名済みビルドをApplicationsへ配置し、一度通常起動してデータ領域を準備した後に使う。公開済み0.3.1にはこの入口を含まない。登録前はGUIと手動workerを終了する。GUIがデータを所有したまま有効化すると`data_in_use`で停止する。
+
+```sh
+'/Applications/ClamAV Desktop.app/Contents/MacOS/clamav-desktop' --login-service enable
+'/Applications/ClamAV Desktop.app/Contents/MacOS/clamav-desktop' --login-service disable
+```
+
+`enable`は登録・開始後にworkerのIPC応答を待つ。`disable`はアイドル終了と所有権解放を確認して登録を外す。検査・隔離・復元などの実行中は`busy`で拒否し、処理の完了後に再実行する。GUIがworkerへ接続中の場合も、操作の混乱を避けるためGUIを閉じてから解除する。
+
+登録失敗時は`login_service_enable_failed`／`login_service_bootstrap_failed`／`login_service_worker_start_timeout`等を返し、既知の登録ファイルを保持する。既に読み込み済みの登録は自動で置換しない。GUIを閉じた状態で`disable`が成功してから`enable`し直す。不明なファイルや移動前のパスとの競合は`login_service_registration_conflict`で停止し、自動で修復・削除しない。OSの許可状態・実際のログイン後動作は別途確認が必要で、事前確認の`permission=unknown`と`loaded=null`は変えていない。
+
+この段階のOS登録・解除は模擬アダプターで検証しており、実環境のログイン設定を変更していない。実worker IPCでのbusy拒否、終了待機、解除前の排他取得を確認した。正式配布ビルドからの実登録は⭕️ [Pending]。
+
+English: The new `--login-service enable|disable` commands manage this user's fixed LaunchAgent only. Close the GUI/manual worker before enabling. Disabling rejects active work, waits for idle shutdown and exclusive ownership, and preserves all app data. Actual signed-app OS registration remains pending.
+
+简体中文：新增的 `--login-service enable|disable` 命令仅管理当前用户的固定 LaunchAgent。启用前请退出 GUI 和手动后台进程。移除时拒绝正在进行的操作，等待空闲退出和独占锁，并保留全部应用数据。正式签名应用的实际系统注册仍待验证。
+
+
+## GUIでログイン起動を管理する（2026-11-04）
+
+新しいビルドの「設定 → 実行プロセス → ログイン時に起動」から有効化／登録解除／再確認を行う。Applications内のDeveloper ID署名済みアプリと通常データ領域を要求し、開発targetや不明な登録では有効化しない。予約時刻などの設定変更は先に保存する。
+
+GUI内Coreを安全に解放してから登録するため、GUIを閉じてCLIを実行する必要はない。手動workerを使用中なら、そのアイドル終了を待ってLaunchAgentへ引き継ぐ。解除後はGUI実行へ戻る。操作・参照保持中はbusyで拒否し、失敗時もロックを奪わない。登録したままの手動worker切替やアプリ更新は拒否するため、先に登録を解除する。
+
+「登録済み」は登録ファイルの一致を表し、OS許可や次回ログイン起動は未確認と表示する。不一致の登録は変更しない。実際の署名済み配布.appでの登録・解除・ログイン検証は⭕️ [Pending]。この機能は公開済み0.3.1には含まれない。
+
+English: Use Settings → Execution → Login startup in the new build. Rust handles ownership transfer, idle-only worker shutdown and recovery; close-and-run-CLI is no longer required. Registration and OS permission remain separate states. Signed-app lifecycle checks are pending.
+
+简体中文：新构建中可使用“设置 → 执行进程 → 登录时启动”。Rust 负责所有权移交、空闲退出及失败恢复，无需先退出 GUI 再运行命令。注册状态与系统许可分开显示。正式签名应用的生命周期验证仍待完成。
+
+
+## OS状態の確認と移動修復（2026-11-04）
+
+設定の「OSの許可」と「読み込み」は別の状態。macOS 13以降は公式APIで許可／許可待ち等を取得し、macOS 12や未照会は未確認とする。読み込み済みはlaunchdに定義がある状態で、workerの稼働やフルディスクアクセスとは別。照会失敗は未読み込みと断定しない。「許可が必要」の場合は「ログイン項目」からOS設定を開き、本人が承認した後に再確認する。起動しない場合は登録解除→有効化で再試行する。
+
+アプリをシステムのApplicationsと本人のApplicationsの間で移動し、旧実行ファイルがなく、登録が既知の形式に完全一致するときは「移動前の登録」と「登録を修復」を表示する。旧アプリが残る場合、任意フォルダへの移動、名前変更、不明な登録、リンクは自動修復しない。処理中は拒否し、旧登録をバックアップしてから現在の署名済みアプリへ切り替える。
+
+```sh
+'/Applications/ClamAV Desktop.app/Contents/MacOS/clamav-desktop' --login-service-check
+'/Applications/ClamAV Desktop.app/Contents/MacOS/clamav-desktop' --login-service repair
+```
+
+本人のApplicationsを使う場合はその絶対パスを指定する。`--login-service-check`は読取専用で、`registration=repairable`、実際に照会した`permission`・`loaded`、`permissionSupported`・`osQueryFailed`も出力する。修復失敗時は旧内容または私有`.backup`を保持する。新しい登録が保存済みなら、解除→有効化で再試行できる。実際の署名済みアプリでの修復・許可変更は⭕️ [Pending]。
+
+English: Settings and the read-only check now separate OS approval from launchd loading. Repair is limited to canonical private registrations for a missing old app in the other supported Applications directory. Approve via Login Items when required; refresh, then explicitly remove/re-enable if startup still fails. Real signed-app lifecycle tests remain pending.
+
+简体中文：设置和只读检查现区分系统批准与 launchd 加载状态。仅可修复指向另一个受支持 Applications 目录中已不存在旧应用的标准私有注册。需要批准时打开登录项，由用户批准并刷新；仍无法启动时明确移除后重新启用。正式签名应用的生命周期验证仍待完成。
+
+
+## 許可後の復旧（0.3.2）
+
+ログイン項目で許可してアプリへ戻ると、許可と読み込み状態を自動で再確認する。状態の照会は重複させず、確認だけで登録やプロセスを変更しない。設定の「再接続・再起動」で明示的に復旧する。CLIは`--login-service recover`。
+
+応答するworkerは検査中でもそのまま接続し、処理を止めない。接続できなければ許可待ちを拒否し、Core所有権を取得できるまで待つ。読み込み状態を確定できた場合だけ、既知の定義を読み直して起動し、認証済みSnapshotを確認する。強制kickstart、launchctl enableによる許可設定の上書き、無条件のCore起動は行わない。失敗時は登録・データを保持し、GUIが安全に所有権を取得できなければworkerプロキシを維持する。
+
+公開用更新署名鍵の独立バックアップが済むまで、0.3.2の配布アプリ公開は保留する。既存0.3.1は引き続き使用でき、ソースとアプリ公開を区別する。
+
+English: 0.3.2 adds a focus-refresh and an explicit reconnect/restart action. Healthy workers retain active jobs; restarting requires idle ownership and known loading state. Approval is never overridden. Signed-app publication awaits the independent successor-key backup.
+
+简体中文：0.3.2 新增窗口恢复焦点时刷新状态，以及显式重新连接／启动。响应正常的后台进程保留当前任务；重新启动必须确认空闲、独占锁和加载状态，不覆盖系统批准设置。正式应用发布仍等待新签名密钥的独立备份。

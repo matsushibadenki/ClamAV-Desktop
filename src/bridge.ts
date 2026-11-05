@@ -73,6 +73,11 @@ export function useCore() {
 type Command =
   | "get_backend_status"
   | "set_worker_mode"
+  | "get_login_service"
+  | "set_login_service"
+  | "repair_login_service"
+  | "recover_login_service"
+  | "open_login_settings"
   | "get_app_update"
   | "check_app_update"
   | "install_app_update"

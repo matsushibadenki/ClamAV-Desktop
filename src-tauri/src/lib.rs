@@ -84,6 +84,124 @@ async fn set_worker_mode(
     .await
     .map_err(err)?
 }
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoginServiceStatus {
+    available: bool,
+    registration: Option<clamav_desktop_core::login_service::Registration>,
+    reason: Option<String>,
+    os: Option<clamav_desktop_core::login_service::OsStatus>,
+}
+#[tauri::command]
+async fn get_login_service(app: AppHandle, window: WebviewWindow) -> Result<LoginServiceStatus> {
+    if window.label() != "main" {
+        return Err("main_window_required".into());
+    }
+    let plan = tauri::async_runtime::spawn_blocking(
+        clamav_desktop_core::login_service::current_user_preflight,
+    )
+    .await
+    .map_err(err)?;
+    match plan {
+        Ok(plan)
+            if app
+                .state::<runtime::Runtime>()
+                .owns_root(&plan.data_directory) =>
+        {
+            let os = clamav_desktop_core::login_service::inspect_os(&plan).await;
+            Ok(LoginServiceStatus {
+                available: true,
+                registration: Some(plan.registration),
+                reason: None,
+                os: Some(os),
+            })
+        }
+        Ok(_) => Ok(LoginServiceStatus {
+            available: false,
+            registration: None,
+            reason: Some("login_service_data_mismatch".into()),
+            os: None,
+        }),
+        Err(reason) => Ok(LoginServiceStatus {
+            available: false,
+            registration: None,
+            reason: Some(reason),
+            os: None,
+        }),
+    }
+}
+#[tauri::command]
+async fn set_login_service(
+    app: AppHandle,
+    window: WebviewWindow,
+    enable: bool,
+) -> Result<runtime::Status> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn(async move {
+        let result = app
+            .state::<runtime::Runtime>()
+            .set_login_service(enable)
+            .await;
+        if let Ok(c) = core(&app) {
+            if !c.snapshot().engine.checked {
+                let _ = engine::refresh(&c).await;
+            }
+        }
+        let _ = app.emit("core:backend", app.state::<runtime::Runtime>().status());
+        if let Ok(backend) = backend(&app) {
+            backend.publish_cached(&app);
+        }
+        result
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
+async fn repair_login_service(app: AppHandle, window: WebviewWindow) -> Result<runtime::Status> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn(async move {
+        let result = app.state::<runtime::Runtime>().repair_login_service().await;
+        if let Ok(c) = core(&app) {
+            if !c.snapshot().engine.checked {
+                let _ = engine::refresh(&c).await;
+            }
+        }
+        let _ = app.emit("core:backend", app.state::<runtime::Runtime>().status());
+        if let Ok(backend) = backend(&app) {
+            backend.publish_cached(&app);
+        }
+        result
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
+async fn recover_login_service(app: AppHandle, window: WebviewWindow) -> Result<runtime::Status> {
+    main_window(&window)?;
+    tauri::async_runtime::spawn(async move {
+        let result = app
+            .state::<runtime::Runtime>()
+            .recover_login_service()
+            .await;
+        if let Ok(c) = core(&app) {
+            if !c.snapshot().engine.checked {
+                let _ = engine::refresh(&c).await;
+            }
+        }
+        let _ = app.emit("core:backend", app.state::<runtime::Runtime>().status());
+        if let Ok(backend) = backend(&app) {
+            backend.publish_cached(&app);
+        }
+        result
+    })
+    .await
+    .map_err(err)?
+}
+#[tauri::command]
+fn open_login_settings(window: WebviewWindow) -> Result<()> {
+    main_window(&window)?;
+    clamav_desktop_core::login_service::open_settings()
+}
 #[tauri::command]
 async fn refresh_engine(app: AppHandle, window: WebviewWindow) -> Result<Engine> {
     main_window(&window)?;
@@ -360,7 +478,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_app_update, check_app_update, install_app_update, restart_app_update,
-            get_snapshot, get_backend_status, set_worker_mode,
+            get_snapshot, get_backend_status, set_worker_mode, get_login_service, set_login_service, repair_login_service, recover_login_service, open_login_settings,
             get_download_cache,
             cleanup_download_cache,
             get_quarantine_detail,

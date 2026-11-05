@@ -56,9 +56,11 @@ function prove({ directory, version, legacyPublicKey, restorePath }) {
   } finally { rmSync(probe, { recursive: true, force: true }); }
 }
 
+let stage = 'verifier-build';
 try {
   // Compile the public-only verifier before generating any long-lived private material.
   if (!step('cargo', ['build', '--quiet', '--manifest-path', 'src-tauri/Cargo.toml', '--example', 'verify_update_signature', '--locked', '--offline'])) throw new Error('Verifier build failed.');
+  stage = 'active-trust-check';
   const config = readJson(join(root, 'src-tauri/tauri.conf.json'));
   const policy = readJson(join(root, 'src-tauri/updater-trust.json'));
   const activeTrust = validateUpdaterTrust(config, policy);
@@ -66,17 +68,24 @@ try {
   const secretRoot = join(root, '.secrets');
   let receipt;
   if (backup) {
+    stage = 'backup-destination';
     validateBackupDestination(secretRoot, args[1]);
+    stage = 'password-input';
     const password = await readBackupPassword();
     try {
+      stage = 'encrypted-backup';
       receipt = backupPreparedKey({ secretRoot, policy, legacyFeed, prove, destination: args[1], archive: options => encryptedKeyBackup({ ...options, password }) });
     } finally { password.fill(0); }
-  } else receipt = generate ? prepareKey({ secretRoot, config, policy, legacyFeed, version: args[2], prove, generate: path => {
+  } else {
+    stage = generate ? 'key-generation' : 'local-key-proof';
+    receipt = generate ? prepareKey({ secretRoot, config, policy, legacyFeed, version: args[2], prove, generate: path => {
     if (!step(cli, ['signer', 'generate', '--ci', '--password', '', '--write-keys', path])) throw new Error('Generation failed.');
   } }) : verifyPreparedKey({ secretRoot, policy, legacyFeed, prove });
+  }
   console.log(JSON.stringify({ schemaVersion: receipt.schemaVersion, version: receipt.version, fingerprint: receipt.fingerprint, localRestoreVerified: receipt.localRestoreVerified, independentBackup: receipt.independentBackup, externalRestoreVerified: receipt.externalRestoreVerified ?? false, lastBackupVerifiedAt: receipt.lastBackupVerifiedAt ?? null, privateDirectory: '.secrets/updater-v2', activeConfigurationUsesPreparedKey: activeTrust.fingerprint === receipt.fingerprint }, null, 2));
 } catch {
   // Even a third-party tool error may contain secret output. Emit fixed text only.
-  console.error('Key preparation/verification failed. Private output was suppressed. Existing keys are never overwritten; use --verify for previously prepared material.');
+  console.error(`Key preparation/verification failed [${stage}]. Private output was suppressed. Existing keys are never overwritten; use --verify for previously prepared material.`);
+  if (stage === 'backup-destination') console.error('Connect the external volume and check that the backup directory exists on a different filesystem, is owned by this account, and is not a link. No password was requested and no backup was written.');
   process.exit(1);
 }

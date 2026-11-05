@@ -76,7 +76,15 @@ export default function App() {
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
-      const key = detail.includes("worker_prepared_installer")
+      const key = detail.includes("login_service_approval_required")
+        ? "loginApprovalHelp"
+        : detail.includes("login_service_query_failed")
+        ? "loginQueryFailed"
+        : detail.includes("login_service_disable_required")
+        ? "loginDisableRequired"
+        : detail.startsWith("login_service_")
+        ? "loginFailed"
+        : detail.includes("worker_prepared_installer")
         ? "workerPreparedInstaller"
         : /^worker_(start|stop)_/.test(detail)
         ? "workerSwitchFailed"

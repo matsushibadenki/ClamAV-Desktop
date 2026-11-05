@@ -13,6 +13,14 @@ pub(crate) struct Ownership {
 impl Ownership {
     #[cfg(unix)]
     pub fn acquire(root: &Path) -> Result<Self> {
+        Self::acquire_named(root, "owner.lock")
+    }
+    #[cfg(unix)]
+    pub(crate) fn acquire_service(root: &Path) -> Result<Self> {
+        Self::acquire_named(root, "login-service.lock")
+    }
+    #[cfg(unix)]
+    fn acquire_named(root: &Path, name: &str) -> Result<Self> {
         use std::os::{
             fd::AsRawFd,
             unix::fs::{MetadataExt, OpenOptionsExt},
@@ -28,7 +36,7 @@ impl Ownership {
             .create(true)
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
-            .open(root.join("owner.lock"))
+            .open(root.join(name))
             .map_err(|e| format!("ownership_lock_failed: {e}"))?;
         let meta = file.metadata().map_err(err)?;
         if !meta.is_file() || meta.uid() != uid || meta.nlink() != 1 || meta.mode() & 0o077 != 0 {
@@ -46,7 +54,7 @@ impl Ownership {
             owner_pid: unsafe { libc::getpid() },
         };
         // Refuse replaced paths rather than owning an inode other processes cannot lock.
-        let named = std::fs::symlink_metadata(root.join("owner.lock")).map_err(err)?;
+        let named = std::fs::symlink_metadata(root.join(name)).map_err(err)?;
         if named.dev() != meta.dev() || named.ino() != meta.ino() || named.file_type().is_symlink()
         {
             return Err("invalid_ownership_lock".into());

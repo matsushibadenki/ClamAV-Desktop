@@ -21,6 +21,7 @@ if (process.platform !== 'darwin') throw new Error('macOS is required.');
 // Fail before touching signing credentials, notarization, or build outputs.
 const policy = signed ? JSON.parse(readFileSync(join(root,'src-tauri/updater-trust.json'),'utf8')) : null;
 const trust = signed ? validateUpdaterTrust(config, policy) : null;
+if (trust?.mode === 'legacy' && version !== trust.baselineVersion) throw new Error('The legacy updater key is retired for new releases. Complete the manual key migration before signing a new version.');
 const legacyFeed = trust?.mode === 'manual' ? frozenLegacyFeed(readRegular(join(root,'src-tauri/updater-legacy.json')), policy) : null;
 const environment = { ...process.env, CI: 'true' };
 function run(command, argv, capture = false, env = environment) {

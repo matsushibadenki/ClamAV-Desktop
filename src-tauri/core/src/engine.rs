@@ -256,6 +256,13 @@ mod diagnostic_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
+    fn x509_warning_does_not_override_success_but_failed_database_test_is_rejected() {
+        assert!(validate_update(Some(0), "ERROR: NULL X509 store\ndaily.cld updated").is_ok());
+        let failure = "cli_loadinfo: Incorrect digital signature\nDatabase test FAILED";
+        assert!(validate_update(Some(8), failure).is_err());
+        assert!(validate_update(None, failure).is_err());
+    }
+    #[test]
     fn cooldown_is_failure_even_when_freshclam_returns_zero() {
         let tail = "WARNING: FreshClam previously received error code 429
 WARNING: You are on cool-down until after: 2099-01-01 12:00:00";

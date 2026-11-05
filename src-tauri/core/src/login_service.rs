@@ -1,5 +1,5 @@
-//! Read-only LaunchAgent preflight. Registration and live ownership handoff are
-//! intentionally separate: producing a plan must never load or stop a service.
+//! LaunchAgent preflight and explicit service management. Producing a plan
+//! remains read-only; registration is a separate, serialized operation.
 use crate::store::{err, Result};
 use serde::Serialize;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -8,6 +8,14 @@ use std::{
     io::Read,
     path::{Component, Path, PathBuf},
 };
+
+mod control;
+mod os_status;
+#[cfg(target_os = "macos")]
+pub use control::{manage_current, Operation};
+#[cfg(target_os = "macos")]
+pub use os_status::{inspect_os, open_settings};
+pub use os_status::{OsStatus, Permission};
 
 pub const LABEL: &str = "app.clamav.desktop.worker";
 const EXECUTABLE: &str = "clamav-desktop";
@@ -20,11 +28,18 @@ pub enum Registration {
     Absent,
     Matches,
     Conflict,
+    Repairable,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Plan {
+    #[serde(skip)]
+    boundary: PathBuf,
+    #[serde(skip)]
+    alternatives: Vec<PathBuf>,
+    #[serde(skip)]
+    uid: u32,
     pub label: &'static str,
     pub executable: PathBuf,
     pub data_directory: PathBuf,
@@ -114,22 +129,19 @@ fn plist(executable: &Path, data: &Path) -> Result<String> {
     ))
 }
 
-fn registration(path: &Path, expected: &[u8], uid: u32) -> Result<Registration> {
+fn private_registration(path: &Path, uid: u32) -> Result<Option<Vec<u8>>> {
     let mut file = match fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
         .open(path)
     {
         Ok(file) => file,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // A dangling link is a conflict, never an available destination.
-            return Ok(if fs::symlink_metadata(path).is_ok() {
-                Registration::Conflict
-            } else {
-                Registration::Absent
-            });
+        Err(e)
+            if e.kind() == std::io::ErrorKind::NotFound && fs::symlink_metadata(path).is_err() =>
+        {
+            return Ok(None)
         }
-        Err(_) => return Ok(Registration::Conflict),
+        Err(_) => return Err("login_service_registration_conflict".into()),
     };
     let meta = file.metadata().map_err(err)?;
     if !meta.is_file()
@@ -138,21 +150,72 @@ fn registration(path: &Path, expected: &[u8], uid: u32) -> Result<Registration> 
         || meta.mode() & 0o077 != 0
         || meta.len() > 16 * 1024
     {
-        return Ok(Registration::Conflict);
+        return Err("login_service_registration_conflict".into());
     }
-    let mut bytes = Vec::new();
+    let mut bytes = vec![];
     (&mut file)
         .take(16 * 1024 + 1)
         .read_to_end(&mut bytes)
         .map_err(err)?;
     let named = fs::symlink_metadata(path).map_err(err)?;
-    Ok(
-        if named.ino() == meta.ino() && named.dev() == meta.dev() && bytes == expected {
-            Registration::Matches
-        } else {
-            Registration::Conflict
-        },
-    )
+    if named.file_type().is_symlink()
+        || named.ino() != meta.ino()
+        || named.dev() != meta.dev()
+        || bytes.len() > 16 * 1024
+    {
+        return Err("login_service_registration_conflict".into());
+    }
+    Ok(Some(bytes))
+}
+fn registration(path: &Path, expected: &[u8], uid: u32) -> Result<Registration> {
+    Ok(match private_registration(path, uid) {
+        Ok(None) => Registration::Absent,
+        Ok(Some(bytes)) if bytes == expected => Registration::Matches,
+        _ => Registration::Conflict,
+    })
+}
+fn classify_registration(
+    path: &Path,
+    executable: &Path,
+    data: &Path,
+    alternatives: &[PathBuf],
+    uid: u32,
+    boundary: &Path,
+) -> Result<Registration> {
+    let expected = plist(executable, data)?;
+    let state = registration(path, expected.as_bytes(), uid)?;
+    if state != Registration::Conflict {
+        return Ok(state);
+    }
+    let Ok(Some(bytes)) = private_registration(path, uid) else {
+        return Ok(Registration::Conflict);
+    };
+    for previous in alternatives {
+        if previous == executable || bytes != plist(previous, data)?.as_bytes() {
+            continue;
+        }
+        // Missing files are expected after a move. Check all remaining ancestors
+        // without accepting a dangling symlink or an unreadable old location.
+        let mut ancestor = previous.as_path();
+        loop {
+            match fs::symlink_metadata(ancestor) {
+                Ok(_) => {
+                    if ancestor != previous && safe_path(ancestor, uid, boundary).is_ok() {
+                        return Ok(Registration::Repairable);
+                    }
+                    break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    let Some(parent) = ancestor.parent() else {
+                        break;
+                    };
+                    ancestor = parent;
+                }
+                Err(_) => break,
+            }
+        }
+    }
+    Ok(Registration::Conflict)
 }
 
 fn build(
@@ -202,8 +265,19 @@ fn build(
     }
     let registration_file = agents.join(format!("{LABEL}.plist"));
     let plist = plist(executable, &data)?;
-    let registration = registration(&registration_file, plist.as_bytes(), uid)?;
+    let alternatives = vec![system, personal];
+    let registration = classify_registration(
+        &registration_file,
+        executable,
+        &data,
+        &alternatives,
+        uid,
+        boundary,
+    )?;
     Ok(Plan {
+        boundary: boundary.to_owned(),
+        alternatives,
+        uid,
         label: LABEL,
         executable: executable.to_owned(),
         data_directory: data,
@@ -260,7 +334,7 @@ pub fn preflight(executable: &Path, home: &Path) -> Result<Plan> {
 
 /// Resolve the account home from the OS account database, never from HOME.
 #[cfg(target_os = "macos")]
-pub fn current_user_preflight() -> Result<Plan> {
+fn account_home() -> Result<PathBuf> {
     use std::{
         ffi::{CStr, OsStr},
         os::unix::ffi::OsStrExt,
@@ -284,7 +358,11 @@ pub fn current_user_preflight() -> Result<Plan> {
     let home = Path::new(OsStr::from_bytes(
         unsafe { CStr::from_ptr(record.pw_dir) }.to_bytes(),
     ));
-    preflight(&std::env::current_exe().map_err(err)?, home)
+    Ok(home.to_owned())
+}
+#[cfg(target_os = "macos")]
+pub fn current_user_preflight() -> Result<Plan> {
+    preflight(&std::env::current_exe().map_err(err)?, &account_home()?)
 }
 
 #[cfg(test)]
@@ -448,7 +526,7 @@ mod tests {
             &f.root,
         )
         .unwrap();
-        assert_eq!(moved.registration, Registration::Conflict);
+        assert_eq!(moved.registration, Registration::Repairable);
         assert_eq!(
             fs::read_to_string(&moved.registration_file).unwrap(),
             system_plan.plist

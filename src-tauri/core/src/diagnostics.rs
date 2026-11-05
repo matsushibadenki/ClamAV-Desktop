@@ -61,6 +61,10 @@ pub fn classify(reason: &str) -> &'static str {
         || lower.contains("os error 13")
     {
         "access_denied"
+    } else if lower.contains("incorrect digital signature")
+        && (lower.contains("cli_loadinfo") || lower.contains("failed to load new database"))
+    {
+        "definitions_verification_failed"
     } else if lower.contains("pgp")
         || lower.contains("signature")
         || lower.contains("gatekeeper")
@@ -250,6 +254,17 @@ mod tests {
             classify("pgp_signature_invalid: abc429def"),
             "verification_failed"
         );
+    }
+    #[test]
+    fn database_signature_failure_is_distinct_from_transport_warning_and_package_signature() {
+        let failure = "freshclam_failed: exit=Some(8); ERROR: NULL X509 store\nWARNING: [LibClamAV] cli_loadinfo: Incorrect digital signature\nERROR: Failed to load new database: Malformed database\nERROR: Database test FAILED.";
+        assert_eq!(classify(failure), "definitions_verification_failed");
+        assert_eq!(
+            classify("cli_loadinfo: Incorrect digital signature"),
+            "definitions_verification_failed"
+        );
+        assert_eq!(classify("pgp_signature_invalid"), "verification_failed");
+        assert_eq!(classify("ERROR: NULL X509 store"), "unknown");
     }
     #[test]
     fn persists_latest_attempt_and_report_does_not_read_file_contents() {

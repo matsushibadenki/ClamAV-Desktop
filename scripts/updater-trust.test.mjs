@@ -125,4 +125,13 @@ test('signed preflight rejects drift before any credential or notarization subpr
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Signed-version verification must remain enabled/);
   assert.doesNotMatch(result.stderr, /Unexpected external process/);
+  changed.plugins.updater.requireSignedVersion = true;
+  changed.version = '0.3.2';
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ version: changed.version }));
+  for (const file of ['src-tauri/Cargo.toml', 'src-tauri/core/Cargo.toml']) writeFileSync(join(root, file), `version = "${changed.version}"\n`);
+  writeFileSync(join(root, 'src-tauri/tauri.conf.json'), JSON.stringify(changed));
+  const retired = spawnSync(process.execPath, ['--import', guard, join(root, 'scripts/release-macos.mjs'), '--signed', '--check'], { cwd: root, encoding: 'utf8' });
+  assert.notEqual(retired.status, 0);
+  assert.match(retired.stderr, /legacy updater key is retired/);
+  assert.doesNotMatch(retired.stderr, /Unexpected external process/);
 });
