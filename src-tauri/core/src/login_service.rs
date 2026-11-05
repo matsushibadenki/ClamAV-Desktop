@@ -322,7 +322,9 @@ pub fn preflight(executable: &Path, home: &Path) -> Result<Plan> {
     }
     let status = std::process::Command::new("/usr/bin/codesign")
         .args(["--verify", "--deep", "--strict", "-R",
-            "anchor apple generic and identifier \"app.clamav.desktop\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"])
+            // codesign requires '=' for inline requirements; otherwise it treats
+            // this expression as a requirement-file path.
+            "=anchor apple generic and identifier \"app.clamav.desktop\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"])
         .arg(contents.parent().ok_or("login_service_invalid_bundle")?)
         .output()
         .map_err(err)?;
@@ -369,6 +371,14 @@ pub fn current_user_preflight() -> Result<Plan> {
 mod tests {
     use super::*;
     use std::os::unix::fs::{symlink, PermissionsExt};
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires an installed Developer ID signed application and the account data directory"]
+    fn installed_signed_application_passes_production_preflight() {
+        let executable = std::env::var_os("CLAMAV_SIGNED_APP_TEST_EXECUTABLE")
+            .expect("set CLAMAV_SIGNED_APP_TEST_EXECUTABLE to the installed signed executable");
+        preflight(Path::new(&executable), &account_home().unwrap()).unwrap();
+    }
     struct Fixture {
         root: PathBuf,
         home: PathBuf,

@@ -1,6 +1,6 @@
 # Worker / local IPC
 
-現在は手動起動・GUIからの切替と、起動済みworkerによる予約検査・定義自動更新に対応。GUIを終了してもworkerは継続する。ログイン時の自動起動登録は未実装。
+手動起動・GUIからの切替、LaunchAgentの登録・解除、OS許可の表示と復旧に対応。GUIを終了してもworkerは継続する。公開0.3.2の登録には署名判定の不具合があり、未公開の修正候補0.3.3で登録・解除・OS許可変更後の復旧を実機確認済み。
 
 ## 実装済み
 
@@ -16,8 +16,10 @@
 - 🟢 [Done] エンジン再確認の非同期IPCと、fork継承FDに起因する通常終了後の所有権取得エラーの修正。
 - 🟢 [Done] 起動中GUIからのworker起動・所有権交代とGUI復帰。実行中参照・処理・準備済みInstallerがある場合は拒否し、切替時にパネル配置を保持。
 - 🟢 [Done] workerの予約claim・missed判定・定義自動更新。GUIと同じ共有スケジューラーを使用。
-- 🟠 [Next] LaunchAgent登録・解除と許可状態の表示。
-- ⭕️ [Pending] worker入口を含む正式配布版の署名・公証・権限検証。
+- 🟢 [Done] LaunchAgent登録・解除、OS許可・読み込み状態の表示と、許可変更後の復旧。
+- 🟠 [Next] 実機検証で見つかった署名判定・ネイティブフォーカス復帰の実機検証済み修正候補0.3.3の公証・配布準備。
+- 🟢 [Done] worker入口を含む正式0.3.2の署名・公証。署名済み0.3.3候補でLaunchAgentの登録・解除・許可変更後の復旧を実機確認。
+- ⭕️ [Pending] 0.3.3の公証・正式配布、worker固有のアクセス権限の検証。
 - ⭕️ [Pending] helper固有のFull Disk Access、別ユーザーからの実接続拒否、ログイン・スリープ・macOS 12 / Intelでの確認。
 
 ## 開発用起動
@@ -67,9 +69,9 @@ src-tauri/target/debug/clamav-worker request --data-dir /private/tmp/clamav-work
 
 OSの所有権ロックを保持したCoreだけがsocketを作る。同じCoreでの二重bindも拒否する。終了時は自身が作ったinodeのsocketだけを削除する。リンク・通常ファイル・公開権限の既存socketを勝手に削除しない。任意のシェル・SQL・実行ファイルを指定する命令はない。
 
-English: This is a manually started development worker with authenticated local IPC and startup-time GUI attachment. Live GUI ownership switching is implemented. Scheduling is supported while the worker runs; login service registration remains unfinished; engine installation and app replacement require local mode.
+English: This is a manually started development worker with authenticated local IPC and startup-time GUI attachment. Live GUI ownership switching is implemented. Scheduling is supported while the worker runs; login service registration, OS permission status and recovery are implemented. Public 0.3.2 incorrectly rejects valid app signatures during registration; the unpublished signed 0.3.3 candidate has passed live registration, removal and OS permission recovery checks. Engine installation and app replacement require local mode.
 
-简体中文：目前为手动启动的开发版后台进程，支持经过身份检查的本地通信及 GUI 启动时连接。已支持 GUI 运行中的所有权切换。后台运行期间已支持定时执行，登录服务注册尚未完成；安装引擎与替换应用需要本地模式。
+简体中文：目前为手动启动的开发版后台进程，支持经过身份检查的本地通信及 GUI 启动时连接。已支持 GUI 运行中的所有权切换。后台运行期间已支持定时执行，已支持登录服务注册、系统许可状态及恢复。公开版 0.3.2 在注册时会错误拒绝有效签名，未发布的签名版 0.3.3 候选版已通过实机注册、注销及系统许可变更后的恢复验证；安装引擎与替换应用需要本地模式。
 
 ## 設定保存（2026-10-16）
 

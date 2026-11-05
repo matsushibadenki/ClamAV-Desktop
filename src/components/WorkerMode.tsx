@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowRightLeft, Monitor, Server, Power, RefreshCw, Wrench, ExternalLink, RotateCw } from "lucide-react";
 import { command, desktop } from "../bridge";
 import type { ViewProps } from "./shared";
@@ -56,6 +57,21 @@ export default function WorkerMode({ data, t, run, pending }: ViewProps) {
     let disposed = false;
     let revision = 0;
     let cleanup: (() => void) | undefined;
+    let cleanupFocus: (() => void) | undefined;
+    let cleanupConnection: (() => void) | undefined;
+    // WKWebView's DOM focus can remain unchanged while switching native apps.
+    // Use the native window event as well when returning from Login Items.
+    void getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (payload && !disposed) focus();
+    }).then((unlisten) => {
+      if (disposed) unlisten(); else cleanupFocus = unlisten;
+    }).catch(() => {});
+    // Permission changes can unload/reload the worker without moving focus.
+    void listen<boolean>("core:connection", () => {
+      if (!disposed) focus();
+    }).then((unlisten) => {
+      if (disposed) unlisten(); else cleanupConnection = unlisten;
+    }).catch(() => {});
     void (async () => {
       cleanup = await listen<Status>("core:backend", ({ payload }) => {
         revision++;
@@ -70,7 +86,7 @@ export default function WorkerMode({ data, t, run, pending }: ViewProps) {
       if (service.status === "rejected") setLogin({ available: false, registration: null, reason: String(service.reason) });
       if (backend.status === "fulfilled" && revision === before) setStatus(backend.value);
     })().catch(() => { cleanup?.(); });
-    return () => { disposed = true; mounted.current = false; cleanup?.(); window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
+    return () => { disposed = true; mounted.current = false; cleanup?.(); cleanupFocus?.(); cleanupConnection?.(); window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
   }, [refreshLogin]);
   const worker = status?.mode === "worker";
   const switching = status?.transitioning || status?.mode === "switching";
