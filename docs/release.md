@@ -124,3 +124,12 @@ node scripts/merge-updater.mjs release-output/0.3.2
 
 
 0.3.2は[公開済み](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.2)。Developer ID署名済みアプリとアプリ／DMGの公証ticket、全7公開ファイルの匿名取得・ハッシュ、新旧フィードと新鍵署名を確認した。実行記録・SHA-256・公証IDは[検証記録](verification.md#2026-11-05--k1-migration-and-public-v032)を参照。初回は旧アプリを終了してDMGから導入する。署名された新アプリから次のK1版への実更新は、次版準備後に別途確認する。
+
+
+## 0.3.3の公証・公開とK1実更新（2026-11-05）
+
+[0.3.3](https://github.com/matsushibadenki/ClamAV-Desktop/releases/tag/v0.3.3)を公開済み。アプリとDMGのApple公証、更新アーカイブのK1署名・署名内版・改変拒否、全7公開ファイルの匿名取得とハッシュを確認した。実機検証済み候補と公開アプリのコード署名ハッシュは同じ。
+
+未改変の公開0.3.2を`/Applications`で起動し、アプリ内で公開0.3.3を確認・ダウンロード・置換した。「今すぐ再起動」からアプリ自身が再起動し、別途起動する前にPID交代を確認。再起動後は0.3.3と最新判定を表示した。設定1件・履歴2件・隔離1件・転送0件の全件ハッシュは更新前と一致する。ログイン登録は未登録を維持した。
+
+0.3.2からはアプリ内更新を利用できる。0.3.1以前はK1移行のため初回DMG導入が必要。旧`latest.json`は0.3.1を維持し、`latest-v2.json`で0.3.3を配信する。詳細は[検証記録](verification.md)と[3言語のリリースノート](releases/0.3.3.md)を参照。
