@@ -231,7 +231,9 @@ async fn idle_owner(plan: &Plan, control: &mut impl Control, wait: Duration) -> 
 async fn bootout(plan: &Plan, control: &mut impl Control) -> Result<()> {
     let code = control.run(Action::Bootout, plan).await?;
     if code == 0
-        || (code == 113
+        // launchctl bootout reports ESRCH (3) for an absent job, whereas
+        // launchctl print reports 113. Require independent absence proof.
+        || (matches!(code, 3 | 113)
             && control.run(Action::PrintDomain, plan).await? == 0
             && control.run(Action::PrintService, plan).await? == 113)
     {
@@ -685,6 +687,10 @@ mod tests {
     async fn uncertain_bootout_keeps_registration_but_confirmed_absence_can_be_removed() {
         for (codes, success) in [
             (vec![5], false),
+            (vec![3, 5], false),
+            (vec![3, 0, 0], false),
+            (vec![3, 0, 5], false),
+            (vec![3, 0, 113], true),
             (vec![113, 5], false),
             (vec![113, 0, 0], false),
             (vec![113, 0, 113], true),
@@ -695,6 +701,43 @@ mod tests {
             assert_eq!(run(&f, Operation::Disable, &mut m).await.is_ok(), success);
             assert_eq!(f.plan.registration_file.exists(), !success);
         }
+    }
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    #[ignore = "requires an installed signed app, no running GUI/worker and an unloaded login service"]
+    async fn native_absent_bootout_preserves_registration() {
+        let executable = std::env::var_os("CLAMAV_SIGNED_APP_TEST_EXECUTABLE")
+            .expect("installed signed executable required");
+        let plan = preflight(Path::new(&executable), &account_home().unwrap()).unwrap();
+        let _management = Ownership::acquire_service(&plan.data_directory).unwrap();
+        let _owner = Ownership::acquire(&plan.data_directory).unwrap();
+        let before = fs::read(&plan.registration_file).unwrap();
+        assert_eq!(loaded_with(&plan, &mut System).await, (Some(false), false));
+        bootout(&plan, &mut System).await.unwrap();
+        assert_eq!(fs::read(&plan.registration_file).unwrap(), before);
+    }
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    #[ignore = "mutates the account login service; requires an explicitly prepared unloaded moved registration"]
+    async fn native_unloaded_moved_registration_repair() {
+        let executable = std::env::var_os("CLAMAV_SIGNED_APP_TEST_EXECUTABLE")
+            .expect("installed signed executable required");
+        let plan = preflight(Path::new(&executable), &account_home().unwrap()).unwrap();
+        assert_eq!(
+            checked_registration(&plan).unwrap(),
+            Registration::Repairable
+        );
+        assert_eq!(loaded_with(&plan, &mut System).await, (Some(false), false));
+        manage(
+            &plan,
+            Operation::Repair,
+            &mut System,
+            Duration::from_secs(15),
+        )
+        .await
+        .unwrap();
+        assert_eq!(checked_registration(&plan).unwrap(), Registration::Matches);
+        assert_eq!(loaded_with(&plan, &mut System).await, (Some(true), false));
     }
     #[test]
     fn command_arguments_target_only_this_users_fixed_service() {
@@ -798,6 +841,33 @@ mod tests {
         .unwrap();
         assert_eq!(f.plan.registration, Registration::Repairable);
         f
+    }
+    #[tokio::test]
+    async fn repair_of_unloaded_moved_registration_requires_confirmed_absence() {
+        for (codes, success) in [
+            (vec![3, 0, 113, 0, 0], true),
+            (vec![3, 0, 0], false),
+            (vec![3, 5], false),
+        ] {
+            let f = moved_fixture();
+            let before = fs::read(&f.plan.registration_file).unwrap();
+            let mut control = Mock::new(codes);
+            assert_eq!(
+                run(&f, Operation::Repair, &mut control).await.is_ok(),
+                success
+            );
+            if success {
+                assert!(control.ready);
+                assert_eq!(
+                    checked_registration(&f.plan).unwrap(),
+                    Registration::Matches
+                );
+            } else {
+                assert_eq!(fs::read(&f.plan.registration_file).unwrap(), before);
+                assert!(!control.calls.contains(&Action::Enable));
+                assert!(!control.calls.contains(&Action::Bootstrap));
+            }
+        }
     }
     #[tokio::test]
     async fn repairs_only_known_moved_template_after_idle_shutdown_and_removes_backup_on_success() {

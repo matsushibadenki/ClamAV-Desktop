@@ -19,7 +19,8 @@
 - 🟢 [Done] LaunchAgent登録・解除、OS許可・読み込み状態の表示と、許可変更後の復旧。
 - 🟢 [Done] 署名判定・ネイティブフォーカス復帰を修正した0.3.3を公証・公開。公開0.3.2からの実更新・再起動も確認。
 - 🟢 [Done] worker入口を含む正式0.3.2の署名・公証。署名済み0.3.3候補でLaunchAgentの登録・解除・許可変更後の復旧を実機確認。
-- 🟠 [Next] 移動済みアプリのLaunchAgent登録修復を実機確認。
+- 🟢 [Done] 公開0.3.3で稼働中workerを伴うApplications間の往復移動・GUI修復と旧コピーが残る場合の拒否を実機確認。
+- 🟠 [Next] 未読み込み時の修復・解除の終了コード処理を修正済み。次版での署名・公証済みGUI検証と配布。
 - ⭕️ [Pending] worker固有のアクセス権限の検証。
 - ⭕️ [Pending] helper固有のFull Disk Access、別ユーザーからの実接続拒否、ログイン・スリープ・macOS 12 / Intelでの確認。
 
@@ -269,3 +270,12 @@ English: Settings and the read-only check now separate OS approval from launchd 
 English: 0.3.2 adds a focus-refresh and an explicit reconnect/restart action. Healthy workers retain active jobs; restarting requires idle ownership and known loading state. Approval is never overridden. Signed-app publication awaits the independent successor-key backup.
 
 简体中文：0.3.2 新增窗口恢复焦点时刷新状态，以及显式重新连接／启动。响应正常的后台进程保留当前任务；重新启动必须确认空闲、独占锁和加载状态，不覆盖系统批准设置。正式应用发布仍等待新签名密钥的独立备份。
+
+
+## 移動修復の実機確認（2026-11-05）
+
+日本語：公開0.3.3で、起動済みworkerを伴う`/Applications`と`~/Applications`間の往復移動・GUI登録修復に成功。旧アプリが残る場合は修復を拒否し、元の登録とPIDを保持する。一方、未読み込み状態では`launchctl bootout`の終了コード3を誤って失敗扱いする。Rust側は修正・実OS検証済みだが、配布0.3.3には未収録。元の配置へ戻し、登録が一致する状態で「再接続・再起動」を使う復旧経路を利用できる。データ保存先は削除しない。
+
+English: Public 0.3.3 passed GUI registration repair after actual moves in both directions between `/Applications` and `~/Applications` with a running worker. An existing old app prevents repair without changing the registration or PID. An unloaded service exposes a `bootout` exit-code-3 bug. The Rust fix passed live OS tests but is not included in public 0.3.3. Restore the original app location and use reconnect/restart once the registration matches; retain the application data.
+
+简体中文：公开版 0.3.3 已通过运行中后台进程随应用在 `/Applications` 与 `~/Applications` 之间双向移动后的 GUI 注册修复验证。旧应用仍存在时会拒绝修复，并保持原注册和 PID。未加载服务会触发 `bootout` 退出码 3 处理错误。Rust 修复已通过实机系统测试，但尚未包含在公开版 0.3.3 中。可恢复应用原位置，在注册匹配后使用重新连接／重启；请保留应用数据。
