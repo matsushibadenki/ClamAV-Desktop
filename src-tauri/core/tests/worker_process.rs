@@ -237,3 +237,79 @@ async fn actual_worker_runs_scheduled_quick_scan_and_retains_the_daily_claim() {
     assert!(snapshot.quarantine.is_empty());
     assert!(home.join("Downloads/harmless.txt").exists());
 }
+
+#[tokio::test]
+async fn diagnostics_identify_live_worker_and_preserve_instances_across_restart() {
+    use clamav_desktop_core::{exports::Kind, ipc::Request};
+    use std::os::unix::fs::PermissionsExt;
+    async fn export(client: &Client, path: &std::path::Path) -> serde_json::Value {
+        let request = Request::new(Command::ExportData {
+            kind: Kind::Diagnostics,
+            destination: path.to_string_lossy().into(),
+            app_update: None,
+        });
+        assert!(matches!(
+            client.send(&request).await.unwrap().into_result().unwrap(),
+            Payload::Ack
+        ));
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                match client
+                    .request(Command::GetFileOperationResult {
+                        request_id: request.id.clone(),
+                    })
+                    .await
+                    .unwrap()
+                {
+                    Payload::FileOperationResult {
+                        result: Some(result),
+                    } => {
+                        result.unwrap();
+                        break;
+                    }
+                    Payload::FileOperationResult { result: None } => (),
+                    _ => panic!("file operation result expected"),
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+    }
+    let fixture = Fixture::new();
+    let root = fixture.0.join("data");
+    let (mut first, client) = start(&root).await;
+    let one = export(&client, &fixture.0.join("first.json")).await;
+    let instance = &one["workerRuntime"]["current"];
+    assert_eq!(instance["pid"], first.0.id());
+    assert_eq!(instance["parentPidAtReady"], std::process::id());
+    assert_eq!(instance["journalPersisted"], true);
+    assert!(chrono::DateTime::parse_from_rfc3339(instance["readyAt"].as_str().unwrap()).is_ok());
+    assert_eq!(one["workerRuntime"]["recent"].as_array().unwrap().len(), 1);
+    client.request(Command::Shutdown).await.unwrap();
+    wait(&mut first).await;
+    let (mut second, client) = start(&root).await;
+    let two = export(&client, &fixture.0.join("second.json")).await;
+    assert_eq!(two["workerRuntime"]["current"]["pid"], second.0.id());
+    assert_ne!(
+        instance["instanceId"],
+        two["workerRuntime"]["current"]["instanceId"]
+    );
+    assert_eq!(two["workerRuntime"]["recent"].as_array().unwrap().len(), 2);
+    assert_eq!(two["workerRuntime"]["recent"][1], *instance);
+    client.request(Command::Shutdown).await.unwrap();
+    wait(&mut second).await;
+    let local = Core::new(root).unwrap();
+    let local_report =
+        serde_json::to_value(clamav_desktop_core::diagnostics::report(&local).unwrap()).unwrap();
+    assert!(local_report["workerRuntime"]["current"].is_null());
+    assert_eq!(
+        local_report["workerRuntime"]["recent"],
+        two["workerRuntime"]["recent"]
+    );
+}

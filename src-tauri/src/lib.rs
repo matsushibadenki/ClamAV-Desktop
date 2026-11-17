@@ -458,6 +458,7 @@ pub fn run() {
                 std::io::Error::other(reason)
             })?;
             app.manage(state);
+            renderer::Renderer::main_window(app.handle())?;
             tauri::async_runtime::spawn(bridge::poll_worker(app.handle().clone()));
             tauri::async_runtime::spawn(maintenance(app.handle().clone()));
             Ok(())

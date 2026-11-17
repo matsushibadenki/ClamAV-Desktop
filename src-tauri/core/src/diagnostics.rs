@@ -186,6 +186,7 @@ pub struct Report {
     pub quarantine_details: Option<crate::details::Export>,
     pub download_cache: Option<crate::downloads::CacheReport>,
     pub scheduled_runs: Option<Vec<crate::scheduler::Run>>,
+    pub worker_runtime: crate::worker_runtime::Report,
     pub collection_errors: Vec<String>,
 }
 pub fn report(c: &Core) -> Result<Report> {
@@ -218,7 +219,9 @@ fn report_with(c: &Core, quarantine: Result<crate::details::Export>) -> Result<R
             None
         }
     };
+    let worker_runtime = crate::worker_runtime::report(c, &mut collection_errors);
     Ok(Report {
+        worker_runtime,
         scheduled_runs,
         schema_version: 1,
         exported_at: now(),

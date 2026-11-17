@@ -31,6 +31,7 @@ pub struct Core {
     pub(crate) settings_gate: Mutex<()>,
     pub prepared: Mutex<Option<(PathBuf, String)>>,
     pub(crate) ipc_active: AtomicBool,
+    pub(crate) worker_start: Mutex<Option<crate::worker_runtime::Start>>,
     notifier: Arc<dyn StateNotifier>,
     // Last field: the DB and document are dropped before process ownership is released.
     _ownership: crate::ownership::Ownership,
@@ -113,6 +114,7 @@ impl Core {
             settings_gate: Mutex::new(()),
             prepared: Mutex::new(None),
             ipc_active: AtomicBool::new(false),
+            worker_start: Mutex::new(None),
             notifier,
             _ownership: ownership,
         })

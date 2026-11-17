@@ -18,6 +18,7 @@ pub async fn run(args: Vec<std::ffi::OsString>) -> Result<()> {
         Some("serve") => {
             let core = Arc::new(Core::new(root)?);
             let server = Server::bind(core.clone())?;
+            crate::worker_runtime::record_ready(&core);
             eprintln!("worker_ready: {}", server.path().display());
             let inspection = tokio::spawn(async move {
                 let _ = engine::inspect(&core).await;

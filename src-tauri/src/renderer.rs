@@ -5,6 +5,18 @@ use crate::store::*;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 pub struct Renderer;
 impl Renderer {
+    pub fn main_window(app: &AppHandle) -> tauri::Result<()> {
+        let config = app
+            .config()
+            .app
+            .windows
+            .iter()
+            .find(|window| window.label == "main")
+            .ok_or_else(|| std::io::Error::other("missing main window configuration"))?;
+        WebviewWindowBuilder::from_config(app, config)?.build()?;
+        Ok(())
+    }
+
     pub fn activity_panel(app: &AppHandle, floating: bool, side: Option<String>) -> Result<()> {
         if let Some(side) = &side {
             if side != "left" && side != "right" {

@@ -290,3 +290,12 @@ English: Public 0.3.3 passed GUI registration repair after actual moves in both 
 English: The unloaded-service issue above is fixed in signed/notarized 0.3.4. Live GUI repair and removal both passed. After GitHub publication, an unmodified public 0.3.3 updated and restarted itself successfully. All saved data was preserved; login registration was removed after testing.
 
 简体中文：上述未加载服务的问题已在签名、公证版 0.3.4 中修复，GUI 注册修复及注销均通过实机验证。GitHub 发布后，未修改的公开版 0.3.3 已成功通过应用内更新并自行重启。全部数据保留，验证后已注销登录服务。
+
+
+## worker起動記録（2026-11-06、未公開）
+
+既存の診断出力に`workerRuntime`を追加。IPCソケットの準備後にUUID・PID・その時点の親PID・準備完了UTC日時・版を記録し、SQLiteへ最大16件を保存する。GUI所有時の`current`はnullで、過去のworker起動記録を現在の稼働と混同しない。保存できない場合も検査を継続し、診断のcollectionErrorsへ記録する。破損・過大な記録は勝手に置き換えない。フィールド定義とログイン判定の限界は[検証手順](login-verification.md#worker起動記録2026-11-06ソース実装)を参照。
+
+English: Unreleased diagnostic exports now include a Rust-owned worker readiness journal (up to 16 instances), separate from the current local GUI owner. UUIDs, PIDs, readiness time and version support pre/post-login correlation; they do not assert a login cause. Failed journal writes do not stop scanning.
+
+简体中文：未发布的诊断导出增加了由 Rust 管理的后台就绪记录（最多 16 个实例），与当前 GUI 本地所有者分开。UUID、PID、就绪时间及版本可用于登录前后比对，但不能证明启动原因。记录保存失败不会停止扫描。

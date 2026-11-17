@@ -26,3 +26,25 @@ Preflight on public 0.3.4 verified a real scheduled Downloads scan with the GUI 
 ## 简体中文
 
 公开版 0.3.4 的事前验证已确认 GUI 关闭时真实执行 Downloads 预约扫描：3 个文件，无错误、无检出，未发送手动扫描命令。重启后台进程并更改预约小时后，同日扫描未重复执行。原设置及未注册状态已恢复，新增的真实扫描及预约记录保留。按用户选择，本次未注销／重新登录，实际登录启动仍待验证。下次请选择当天尚无预约执行记录的日期，保存将来时刻的预约并关闭 GUI；由用户保存工作后自行注销、登录。在手动启动 GUI 或发送服务启动命令之前，先以只读方式记录 launchd、进程和 IPC 证据。保留真实扫描及预约记录，完成后恢复原设置及注册状态。
+
+## worker起動記録（2026-11-06、ソース実装）
+
+新しいworkerは、Coreの所有権を取得してIPCソケットを準備した時点で起動記録を保存する。既存の診断JSON出力（GUIまたはworkerのExportData/diagnostics）に`workerRuntime`を追加した。公開0.3.4には未収録。
+
+| 項目 | 意味 |
+| --- | --- |
+| `current` | 診断を生成するworkerの記録。GUIがCoreを所有する場合はnull。 |
+| `recent` | SQLiteに保存した新しい順の最大16件。未記録は空配列、読み取り不能はnull。 |
+| `instanceId` | workerの準備ごとに生成するUUID。PID再利用と区別するために使う。 |
+| `pid` / `parentPidAtReady` | 記録時のPIDと親PID。親PIDは後からの再親化を追跡する値ではない。 |
+| `readyAt` | IPCソケット準備後のUTC日時。OSのプロセス作成日時やログイン日時ではない。 |
+| `appVersion` | workerコアのビルド版。署名・公証の照合は別途行う。 |
+| `journalPersisted` | この記録の保存が成功したか。falseなら過去記録との比較で保存済みと扱わない。 |
+
+診断の`collectionErrors`には、保存不能・読み取り不能・破損を固定コードで記録する。破損した記録を上書きせず、記録の保存失敗だけでworkerの検査機能を止めない。記録に環境変数・起動引数・ファイル内容・認証情報は含めない。SQLiteの予約台帳は変更しない。
+
+次回検証では、ログアウト前と再ログイン後の診断を非公開で保存し、`instanceId`の交代、`readyAt`、実launchd PIDと予約台帳のscan IDを照合する。この記録だけでログイン自動起動成功とは判断しない。手動起動・bootstrap・recoverでも新しい記録は作られる。実ログインの実施と、証拠採取前に起動操作をしていないことの確認が引き続き必要。
+
+English: The source implementation adds `workerRuntime` to diagnostic exports, with the current worker instance and up to 16 persisted readiness records. A UUID distinguishes instances even when PIDs are reused; `readyAt` is socket-readiness time, not OS login/process creation time. Local GUI exports have `current=null`. Persistence/read/corruption errors are reported without blocking scanning or replacing corrupt evidence. No arguments, environment or file contents are recorded. Compare private pre/post-login reports with launchd and scheduled-run evidence; these records alone do not prove login startup. This addition is not in public 0.3.4.
+
+简体中文：源码实现为诊断导出添加 `workerRuntime`，包含当前后台实例及最多 16 条持久化准备就绪记录。UUID 可区分 PID 被重复使用的不同实例；`readyAt` 是套接字准备就绪的时间，并非系统登录或进程创建时间。GUI 本地导出时 `current=null`。保存、读取或记录损坏错误会被报告，不阻止扫描，也不覆盖损坏的原记录。不保存启动参数、环境变量或文件内容。登录前后应私下保存诊断并结合 launchd 及预约记录比对；仅凭这些记录不能证明登录自动启动成功。公开版 0.3.4 尚未包含此功能。
