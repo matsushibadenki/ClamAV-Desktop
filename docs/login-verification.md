@@ -48,3 +48,11 @@ Preflight on public 0.3.4 verified a real scheduled Downloads scan with the GUI 
 English: The source implementation adds `workerRuntime` to diagnostic exports, with the current worker instance and up to 16 persisted readiness records. A UUID distinguishes instances even when PIDs are reused; `readyAt` is socket-readiness time, not OS login/process creation time. Local GUI exports have `current=null`. Persistence/read/corruption errors are reported without blocking scanning or replacing corrupt evidence. No arguments, environment or file contents are recorded. Compare private pre/post-login reports with launchd and scheduled-run evidence; these records alone do not prove login startup. This addition is not in public 0.3.4.
 
 简体中文：源码实现为诊断导出添加 `workerRuntime`，包含当前后台实例及最多 16 条持久化准备就绪记录。UUID 可区分 PID 被重复使用的不同实例；`readyAt` 是套接字准备就绪的时间，并非系统登录或进程创建时间。GUI 本地导出时 `current=null`。保存、读取或记录损坏错误会被报告，不阻止扫描，也不覆盖损坏的原记录。不保存启动参数、环境变量或文件内容。登录前后应私下保存诊断并结合 launchd 及预约记录比对；仅凭这些记录不能证明登录自动启动成功。公开版 0.3.4 尚未包含此功能。
+
+## GUIを開かずに診断を採取する
+
+リポジトリで `node scripts/capture-login-evidence.mjs` を実行する。個人用Applicationsにインストールした場合は、署名済みアプリの絶対パスを引数に指定する。ログアウト前と再ログイン後のJSONを私有領域に保存して比較する。PIDが採取中に交代した場合は再取得する。実ログインの時刻と照合し、自動起動と予約実行を判定する。
+
+English — Run `node scripts/capture-login-evidence.mjs` from the repository to collect registration, launchd, IPC and the latest scheduled run without opening the GUI. Pass the absolute installed app path if needed. Compare private captures before logout and after login with the actual login time.
+
+简体中文 — 在仓库中运行 `node scripts/capture-login-evidence.mjs`，无需打开 GUI 即可采集注册、launchd、IPC 及最近的预约执行状态。必要时传入已安装应用的绝对路径。请私下保存注销前与登录后的记录，并与实际登录时间比对。
